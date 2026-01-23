@@ -1,0 +1,7 @@
+[workspace]
+resolver = "3"
+members = ["connect_4", "examples/*"]
+
+[workspace.dependencies]
+wasmtime = "41.0.0"
+wit-bindgen = "0.51.0"

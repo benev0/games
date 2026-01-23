@@ -1,0 +1,8 @@
+[package]
+name = "connect_4"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wasmtime = { workspace = true }
+wit-bindgen = { workspace = true }

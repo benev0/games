@@ -1,0 +1,14 @@
+package games:connect@0.1.0;
+
+interface next-move {
+    record board {
+        heights: list<u8>,
+        columns: list<u8>,
+    }
+
+    make-move: func(game-state: board) -> u8;
+}
+
+world connect {
+    export next-move;
+}
