@@ -13,9 +13,18 @@ const BOARD_COLUMNS: u8 = 7;
 const WIN_CONNECT: u8 = 4;
 const VERTICAL_WIN: u8 = 15;
 
+#[derive(Debug)]
 enum BadMove {
     ColumnInvalid,
-    ColumnFull
+    ColumnFull,
+    WasmError
+}
+
+#[derive(Debug)]
+enum GameEnd{
+    Win(bool),
+    Loss(bool, BadMove),
+    Draw,
 }
 
 impl Board {
@@ -183,17 +192,37 @@ fn main() -> wasmtime::Result<()> {
     let bindings = Connect::instantiate(&mut store, &component, &linker)?;
 
     let mut board = Board {
-        heights: vec![ 3, 0, 0, 0, 0, 0, 0 ],
-        columns: vec![ 7, 0, 0, 0, 0, 0, 0 ],
+        heights: vec![ 0, 0, 0, 0, 0, 0, 0 ],
+        columns: vec![ 0, 0, 0, 0, 0, 0, 0 ],
     };
 
-    let result = bindings.games_connect_next_move().call_make_move(&mut store, &board)?;
-    dbg!(&board);
-    let _status = board.confirm_move(result);
-    dbg!(&board);
-    let game_win = board.check_win(result);
-    dbg!(&board);
+    // p1: true, p2 false
+    let mut move_count = 0;
+    let mut to_play = true;
+    let win = loop {
+        if move_count >= BOARD_ROWS * BOARD_COLUMNS {
+            break GameEnd::Draw;
+        }
 
-    println!("move made: {}, game is won: {}", result, game_win);
+        let move_result = bindings.games_connect_next_move().call_make_move(&mut store, &board);
+
+        let result = if let Ok(result) = move_result {
+            result
+        } else {
+            break GameEnd::Loss(to_play, BadMove::WasmError)
+        };
+
+        if let Err(status) = board.confirm_move(result) {
+            break GameEnd::Loss(to_play, status);
+        } else if board.check_win(result) {
+            break GameEnd::Win(to_play);
+        }
+
+        move_count += 1;
+        to_play = !to_play;
+    };
+
+    dbg!(&win);
+    dbg!(move_count + 1);
     Ok(())
 }
