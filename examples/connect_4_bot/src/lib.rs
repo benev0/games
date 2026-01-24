@@ -17,7 +17,7 @@ impl bindings::exports::games::connect::next_move::Guest for ConnectComponent {
         game_state.heights.iter()
             .enumerate()
             .find(|&(_, &v)| v < 6)
-            .and_then(|(k, _)| Some(k as u8))
+            .and_then(|(k, _)| k.try_into().ok())
             .unwrap_or(7)
     }
 }
