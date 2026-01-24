@@ -184,12 +184,14 @@ impl Board {
 
 fn main() -> wasmtime::Result<()> {
     let engine = Engine::default();
-    let component = Component::from_file(&engine, "target/wasm32-wasip2/release/connect_4_bot.wasm")?;
+    let p1_component = Component::from_file(&engine, "target/wasm32-wasip2/release/connect_4_bot.wasm")?;
+    let p2_component = Component::from_file(&engine, "target/wasm32-wasip2/release/connect_4_bot.wasm")?;
 
     let linker = Linker::new(&engine);
     let mut store = Store::new(&engine, ());
 
-    let bindings = Connect::instantiate(&mut store, &component, &linker)?;
+    let p1_bindings = Connect::instantiate(&mut store, &p1_component, &linker)?;
+    let p2_bindings = Connect::instantiate(&mut store, &p2_component, &linker)?;
 
     let mut board = Board {
         heights: vec![ 0, 0, 0, 0, 0, 0, 0 ],
@@ -204,7 +206,10 @@ fn main() -> wasmtime::Result<()> {
             break GameEnd::Draw;
         }
 
-        let move_result = bindings.games_connect_next_move().call_make_move(&mut store, &board);
+        let move_result = match to_play {
+            true => p1_bindings.games_connect_next_move().call_make_move(&mut store, &board),
+            false => p2_bindings.games_connect_next_move().call_make_move(&mut store, &board),
+        };
 
         let result = if let Ok(result) = move_result {
             result
@@ -222,6 +227,8 @@ fn main() -> wasmtime::Result<()> {
         to_play = !to_play;
     };
 
+
+    dbg!(&board);
     dbg!(&win);
     dbg!(move_count + 1);
     Ok(())
