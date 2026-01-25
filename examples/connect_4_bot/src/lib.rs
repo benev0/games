@@ -2,7 +2,7 @@ use crate::bindings::exports::games::connect::next_move::Board;
 
 mod bindings {
     wit_bindgen::generate!({
-        path: "../../connect_4/wit/connect.wit",
+        path: "../../wit/connect.wit",
     });
 
     use super::ConnectComponent;

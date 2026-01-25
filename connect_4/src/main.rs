@@ -5,7 +5,7 @@ use crate::exports::games::connect::next_move::{Board,};
 
 
 bindgen!({
-    path: "wit/connect.wit",
+    path: "../wit/connect.wit",
 });
 
 const BOARD_ROWS: u8 = 6;
