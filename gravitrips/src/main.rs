@@ -1,5 +1,6 @@
 use std::env;
-use wasmtime::{Error, component::*};
+use std::num::Wrapping;
+use wasmtime::{component::*};
 use wasmtime::{Engine, Store};
 
 use crate::exports::games::gravitrips::next_move::{Board,};
@@ -39,7 +40,7 @@ impl Board {
             return true;
         }
 
-        // horasantal
+        // horizontal
         if let Some(&column_data) = self.columns.get::<usize>(column.into())
             && let Some(&height_level) = self.heights.get::<usize>(column.into())
             && (column_data >> (height_level - 1)) & 1 == 0
@@ -185,8 +186,6 @@ impl Board {
 
 fn main() -> wasmtime::Result<()> {
     let args: Vec<String> = env::args().collect();
-
-    dbg!(&args);
 
     if args.len() != 3 {
         println!("Expected two arguments. The paths of wasm modules: player 1 and player 2.");
