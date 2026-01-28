@@ -1,17 +1,17 @@
-use crate::bindings::exports::games::connect::next_move::Board;
+use crate::bindings::exports::games::gravitrips::next_move::Board;
 
 mod bindings {
     wit_bindgen::generate!({
-        path: "../../wit/connect.wit",
+        path: "../../wit/gravitrips.wit",
     });
 
-    use super::ConnectComponent;
-    export!(ConnectComponent);
+    use super::GravitripsComponent;
+    export!(GravitripsComponent);
 }
 
-struct ConnectComponent;
+struct GravitripsComponent;
 
-impl bindings::exports::games::connect::next_move::Guest for ConnectComponent {
+impl bindings::exports::games::gravitrips::next_move::Guest for GravitripsComponent {
     // move in the first open column
     fn make_move(game_state:Board,) -> u8 {
         game_state.heights.iter()
