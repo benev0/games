@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["connect_4", "examples/*"]
+members = ["gravitrips", "examples/*"]
 
 [workspace.dependencies]
 wasmtime = "41.0.0"

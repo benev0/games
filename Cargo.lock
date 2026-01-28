@@ -107,21 +107,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "connect_4"
-version = "0.1.0"
-dependencies = [
- "wasmtime",
- "wit-bindgen",
-]
-
-[[package]]
-name = "connect_4_bot"
-version = "0.1.0"
-dependencies = [
- "wit-bindgen",
-]
-
-[[package]]
 name = "cpp_demangle"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -555,6 +540,21 @@ dependencies = [
  "fallible-iterator",
  "indexmap",
  "stable_deref_trait",
+]
+
+[[package]]
+name = "gravitrips"
+version = "0.1.0"
+dependencies = [
+ "wasmtime",
+ "wit-bindgen",
+]
+
+[[package]]
+name = "gravitrips_bot"
+version = "0.1.0"
+dependencies = [
+ "wit-bindgen",
 ]
 
 [[package]]

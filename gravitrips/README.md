@@ -1,9 +1,9 @@
-# Connect 4
+# Gravitrips
 
 A Game of falling pieces played on with 7 columns of 6 height. Place 4 in a row, column, diagonal to win.
 
 ## Bot Instructions
-- To build a bot satisfy the [spec](./wit/connect.wit).
+- To build a bot satisfy the [spec](../wit/gravitrips.wit).
 - 1s always to play.
 - Output the column to play your next piece 0 indexing.
 - Invalid play / crashing will result in a loss
