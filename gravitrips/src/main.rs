@@ -1,4 +1,5 @@
-use wasmtime::component::*;
+use std::env;
+use wasmtime::{Error, component::*};
 use wasmtime::{Engine, Store};
 
 use crate::exports::games::gravitrips::next_move::{Board,};
@@ -183,9 +184,18 @@ impl Board {
 }
 
 fn main() -> wasmtime::Result<()> {
+    let args: Vec<String> = env::args().collect();
+
+    dbg!(&args);
+
+    if args.len() != 3 {
+        println!("Expected two arguments. The paths of wasm modules: player 1 and player 2.");
+        return Ok(());
+    }
+
     let engine = Engine::default();
-    let p1_component = Component::from_file(&engine, "target/wasm32-wasip2/release/gravitrips_bot.wasm")?;
-    let p2_component = Component::from_file(&engine, "target/wasm32-wasip2/release/gravitrips_bot.wasm")?;
+    let p1_component = Component::from_file(&engine, args[1].clone())?;
+    let p2_component = Component::from_file(&engine, args[2].clone())?;
 
     let linker = Linker::new(&engine);
     let mut store = Store::new(&engine, ());
