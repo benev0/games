@@ -2,6 +2,9 @@
 resolver = "3"
 members = ["gravitrips", "examples/*"]
 
+[profile.dev.package.gravitrips]
+overflow-checks = false
+
 [workspace.dependencies]
 wasmtime = "41.0.0"
 wit-bindgen = "0.51.0"
