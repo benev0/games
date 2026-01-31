@@ -1,0 +1,12 @@
+[package]
+name = "site"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+axum-htmx = { workspace = true }
+minijinja = { workspace = true }
+once_cell = { workspace = true }
