@@ -1,1 +1,7 @@
 <h1>Welcome to Games</h1>
+
+<ul hx-boost="true" hx-target="#page-content" hx-push-url="true">
+{% for game in games %}
+  <li><a href="/games/{{ game }}">{{ game }}</a></li>
+{% endfor %}
+</ul>
