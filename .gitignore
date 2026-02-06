@@ -1,1 +1,7 @@
 /target
+/.direnv
+
+*.sql
+*.db
+*-shm
+*-wal

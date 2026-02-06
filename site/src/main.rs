@@ -1,3 +1,5 @@
+mod database;
+
 use axum::{Router, extract::Path, response::Html, routing::get};
 use axum_htmx::HxBoosted;
 use minijinja::{Environment, path_loader};
@@ -18,6 +20,10 @@ static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
 
 #[tokio::main]
 async fn main() {
+    let status = database::initialize().await;
+
+    dbg!(&status);
+
     init_tracing();
 
     let public_routes = Router::new()

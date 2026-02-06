@@ -14,3 +14,5 @@ serde = "1.0.228"
 tower-http = { version = "0.6.8", features = ["trace", "catch-panic"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio"]}
+anyhow = "1.0.101"
