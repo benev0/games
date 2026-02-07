@@ -1,7 +1,7 @@
 /target
 /.direnv
 
-*.sql
+# *.sql
 *.db
 *-shm
 *-wal

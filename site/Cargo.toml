@@ -14,5 +14,8 @@ serde = "1.0.228"
 tower-http = { version = "0.6.8", features = ["trace", "catch-panic"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio"]}
+sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio", "chrono"]}
 anyhow = "1.0.101"
+argon2 = "0.5.3"
+axum-extra = { version = "0.12.5", features = ["cookie", "cookie-private", "form"]}
+chrono = "0.4.43"
