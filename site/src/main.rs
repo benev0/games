@@ -1,6 +1,6 @@
 mod database;
 
-use axum::{Router, extract::{FromRef, Path, Request, State}, middleware::{self, Next}, response::{Html, IntoResponse, Redirect, Response}, routing::{get, post}};
+use axum::{Router, extract::{FromRef, Path, Request, State}, http::StatusCode, middleware::{self, Next}, response::{Html, IntoResponse, Redirect, Response}, routing::{get, post}};
 use axum_extra::extract::{CookieJar, Form, PrivateCookieJar, cookie::{Cookie, Key}};
 use axum_htmx::HxBoosted;
 use minijinja::{Environment, path_loader};
@@ -13,7 +13,7 @@ use minijinja::context;
 use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::database::{create_user, login_user};
+use crate::database::{create_game, create_user, get_games, login_user, user_is_admin};
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
     let mut env = Environment::new();
@@ -46,6 +46,10 @@ struct Signup {
     confirm_passwd: String,
 }
 
+#[derive(Deserialize, Debug)]
+struct Name {
+    name: String,
+}
 
 
 #[tokio::main]
@@ -75,11 +79,23 @@ async fn main() {
         .route("/settings", get(settings))
         .route("/games/{game}", get(specific_game))
         .with_state(state.clone())
-        .layer(middleware::from_fn_with_state(state, require_auth));
+        .layer(middleware::from_fn_with_state(state.clone(), require_auth));
+
+    let admin_routes = Router::new()
+        .route("/game", get(admin_game))
+        .route("/game", post(admin_make_game))
+        // .route("/end-code", method_router)
+        // .route("/event", )
+        .with_state(state.clone())
+        // todo: ensure that user is an admin
+        .layer(middleware::from_fn_with_state(state, require_admin));
+
+
 
     let app = Router::new()
         .merge(public_routes)
         .merge(protected_routes)
+        .nest("/admin", admin_routes)
         // todo: protect csrf
         .layer(CatchPanicLayer::new())
         .layer(TraceLayer::new_for_http());
@@ -97,6 +113,30 @@ fn init_tracing() {
         .with(tracing_subscriber::EnvFilter::new("info,tower_http=trace"))
         .with(tracing_subscriber::fmt::layer())
         .init();
+}
+
+
+async fn require_admin(
+    State(state): State<SiteState>,
+    jar: CookieJar,
+    request: Request,
+    next: Next
+) -> Response {
+    let auth = if let Some(auth) = jar.get("auth")
+        .and_then(|cookie| PrivateCookieJar::new(state.key).decrypt(cookie.clone()))
+    {
+        auth
+    } else {
+        return Redirect::to("/login").into_response()
+    };
+
+    if let Ok(auth) = auth.value().parse()
+        && let Ok(true) = user_is_admin(&state.database, auth).await
+    {
+        next.run(request).await
+    } else {
+        StatusCode::BAD_REQUEST.into_response()
+    }
 }
 
 async fn require_auth(
@@ -171,8 +211,9 @@ async fn signup(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
     decide_htmx(hx_boosted, "signup", context! {})
 }
 
-async fn games(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
-    decide_htmx(hx_boosted, "games", context! { games => vec!["gravitrips", "chess"]})
+async fn games(State(state): State<SiteState>, HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
+    let game_list = get_games(&state.database).await.unwrap();
+    decide_htmx(hx_boosted, "games", context! { games => game_list })
 }
 
 async fn profile(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
@@ -183,8 +224,24 @@ async fn settings(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
     decide_htmx(hx_boosted, "settings", context! {})
 }
 
-async fn specific_game(Path(game): Path<String>, HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
-    decide_htmx(hx_boosted, &format!("games/{}", game), context! {})
+async fn specific_game(Path(game_name): Path<String>, HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
+    // todo: fetch content from db
+    decide_htmx(hx_boosted, "games_", context! { game => game_name })
+}
+
+async fn admin_game(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
+    decide_htmx(hx_boosted, "admin/game", context! {})
+}
+
+async fn admin_make_game(
+    State(state): State<SiteState>,
+    HxBoosted(_hx_boosted): HxBoosted,
+    Form(game): Form<Name>
+) -> StatusCode {
+    match create_game(&state.database, game.name).await {
+        Ok(_) => StatusCode::CREATED,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
 }
 
 fn decide_htmx<S>(htmx: bool, template: &str, ctx: S) -> Html<String>

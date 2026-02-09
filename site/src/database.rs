@@ -66,3 +66,50 @@ pub (crate) async fn login_user(pool: &Pool<Sqlite>, username: String, passwd: S
 
     Ok(rec.user_id)
 }
+
+pub (crate) async fn get_games(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<String>> {
+    let mut conn = pool.acquire().await?;
+
+    let games: Vec<String> = query!("select game_name from game")
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .map(|rec| rec.game_name)
+        .collect();
+
+    Ok(games)
+}
+
+pub (crate) async fn user_is_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<bool> {
+    let mut conn = pool.acquire().await?;
+
+    let is_admin = query!("select * from administrator where user_id = ?1", id)
+        .fetch_one(&mut *conn)
+        .await
+        .map(|req| req.user_id == id)
+        .unwrap_or(false);
+
+    Ok(is_admin)
+}
+
+pub (crate) async fn create_game(pool: &Pool<Sqlite>, name: String) -> anyhow::Result<i64> {
+    let mut conn = pool.acquire().await?;
+
+    let id = query!("insert into game (game_name) values ( ?1 )", name)
+        .execute(&mut *conn)
+        .await?
+        .last_insert_rowid();
+
+    Ok(id)
+}
+
+pub (crate) async fn create_end_code(pool: &Pool<Sqlite>, name: String) -> anyhow::Result<i64> {
+    let mut conn = pool.acquire().await?;
+
+    let id = query!("insert into game_code (code) values ( ?1 )", name)
+        .execute(&mut *conn)
+        .await?
+        .last_insert_rowid();
+
+    Ok(id)
+}

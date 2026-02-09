@@ -16,6 +16,11 @@ create table if not exists passwd (
     foreign key (user_id) references user(id)
 ) without rowid;
 
+create table if not exists administrator (
+    user_id integer primary key,
+    foreign key (user_id) references user(id)
+) without rowid;
+
 create table if not exists game (
     id integer primary key,
     game_name varchar(255) not null
@@ -52,7 +57,7 @@ create table if not exists bot_participates_in_event (
 
 ) without rowid;
 
-create table if not exists compeated_against (
+create table if not exists competed_against (
     id integer primary key,
     in_event integer, -- may not be a part of an event
     primary_bot integer not null,
