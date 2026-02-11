@@ -1,0 +1,8 @@
+{% if is_admin %}
+  <p>you are an admin</p>
+{% else %}
+  <p>make self admin</p>
+  <form action="/add", method="post">
+    <input type="submit" value="Submit">
+  </form>
+{% endif %}

@@ -13,7 +13,7 @@ use minijinja::context;
 use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::database::{create_game, create_user, get_games, login_user, user_is_admin};
+use crate::database::{create_game, create_user, get_games, login_user, make_user_admin, user_is_admin};
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
     let mut env = Environment::new();
@@ -78,6 +78,8 @@ async fn main() {
         .route("/profile", get(profile))
         .route("/settings", get(settings))
         .route("/games/{game}", get(specific_game))
+        .route("/admin", get(admin))
+        .route("/admin", post(make_admin))
         .with_state(state.clone())
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
@@ -87,15 +89,14 @@ async fn main() {
         // .route("/end-code", method_router)
         // .route("/event", )
         .with_state(state.clone())
-        // todo: ensure that user is an admin
         .layer(middleware::from_fn_with_state(state, require_admin));
 
-
-
     let app = Router::new()
-        .merge(public_routes)
-        .merge(protected_routes)
         .nest("/admin", admin_routes)
+        .merge(protected_routes)
+        .merge(public_routes)
+
+
         // todo: protect csrf
         .layer(CatchPanicLayer::new())
         .layer(TraceLayer::new_for_http());
@@ -115,6 +116,16 @@ fn init_tracing() {
         .init();
 }
 
+fn get_user_id(jar: PrivateCookieJar) -> anyhow::Result<i64> {
+    let auth = jar.get("auth")
+        // .and_then(|cookie| PrivateCookieJar::new(key).decrypt(cookie.clone()))
+        .ok_or(anyhow::Error::msg("failed to retrieve valid cookie"))?;
+
+    auth
+        .value()
+        .parse()
+        .map_err(anyhow::Error::from)
+}
 
 async fn require_admin(
     State(state): State<SiteState>,
@@ -171,6 +182,7 @@ async fn login_submit(
         Ok(uid) => {
             let updated_jar = jar.add(Cookie::build(("auth", uid.to_string()))
                 .http_only(true)
+                .same_site(axum_extra::extract::cookie::SameSite::Strict)
                 .build());
 
             (updated_jar, Redirect::to("/").into_response())
@@ -195,6 +207,7 @@ async fn signup_submit(
         Ok(uid) => {
             let updated_jar = jar.add(Cookie::build(("auth", uid.to_string()))
                 .http_only(true)
+                .same_site(axum_extra::extract::cookie::SameSite::Strict)
                 .build());
 
             (updated_jar, Redirect::to("/").into_response())
@@ -242,6 +255,31 @@ async fn admin_make_game(
         Ok(_) => StatusCode::CREATED,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
+}
+
+async fn admin(
+    State(state): State<SiteState>,
+    HxBoosted(hx_boosted): HxBoosted,
+    jar: PrivateCookieJar
+) -> Html<String> {
+    let id = get_user_id(jar).unwrap();
+    let user_is_admin = user_is_admin(&state.database, id)
+        .await
+        .unwrap_or(false);
+
+    decide_htmx(hx_boosted, "admin", context! {is_admin => user_is_admin})
+}
+
+async fn make_admin(
+    State(state): State<SiteState>,
+    HxBoosted(hx_boosted): HxBoosted,
+    jar: PrivateCookieJar
+) -> Html<String> {
+    let id = get_user_id(jar).unwrap();
+
+    let success = make_user_admin(&state.database, id).await.is_ok();
+
+    decide_htmx(hx_boosted, "admin", context! {is_admin => success})
 }
 
 fn decide_htmx<S>(htmx: bool, template: &str, ctx: S) -> Html<String>

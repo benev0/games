@@ -80,6 +80,16 @@ pub (crate) async fn get_games(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<String
     Ok(games)
 }
 
+pub (crate) async fn make_user_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<()> {
+    let mut conn = pool.acquire().await?;
+
+    query!("insert into administrator (user_id) values ( ?1 )", id)
+        .execute(&mut *conn)
+        .await?;
+
+    Ok(())
+}
+
 pub (crate) async fn user_is_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<bool> {
     let mut conn = pool.acquire().await?;
 
