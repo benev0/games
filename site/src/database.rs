@@ -1,11 +1,16 @@
 use std::str::FromStr;
 
-
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier, password_hash::{SaltString, rand_core}};
+use argon2::{
+    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
+    password_hash::{SaltString, rand_core},
+};
 use chrono::Utc;
-use sqlx::{Pool, Sqlite, query, sqlite::{self, SqlitePool}};
+use sqlx::{
+    Pool, Sqlite, query,
+    sqlite::{self, SqlitePool},
+};
 
-pub (crate) async fn initialize() -> anyhow::Result<Pool<Sqlite>> {
+pub(crate) async fn initialize() -> anyhow::Result<Pool<Sqlite>> {
     let options = sqlite::SqliteConnectOptions::from_str(&std::env::var("DATABASE_URL")?)?
         .foreign_keys(true)
         .create_if_missing(false)
@@ -23,36 +28,53 @@ pub (crate) async fn initialize() -> anyhow::Result<Pool<Sqlite>> {
     Ok(pool)
 }
 
-pub (crate) async fn create_user(pool: &Pool<Sqlite>, username: String, passwd: String) -> anyhow::Result<i64> {
+pub(crate) async fn create_user(
+    pool: &Pool<Sqlite>,
+    username: String,
+    passwd: String,
+) -> anyhow::Result<i64> {
     let salt = SaltString::generate(&mut rand_core::OsRng);
     let argon2 = Argon2::default();
-    let password_hash = argon2.hash_password(passwd.as_bytes(), &salt)
+    let password_hash = argon2
+        .hash_password(passwd.as_bytes(), &salt)
         .map_err(|_| anyhow::Error::msg("argon2 hashing failed"))?;
-
 
     let mut transaction = pool.begin().await?;
 
     let time = Utc::now();
 
-    let id = query!("insert into user (username, created) values ( ?1, ?2 )", username, time)
-        .execute(&mut *transaction)
-        .await?
-        .last_insert_rowid();
+    let id = query!(
+        "insert into user (username, created) values ( ?1, ?2 )",
+        username,
+        time
+    )
+    .execute(&mut *transaction)
+    .await?
+    .last_insert_rowid();
 
     let salt_string = salt.as_str();
     let hash_string = password_hash.to_string();
 
-    query!("insert into passwd ( user_id, algo, salt, pass_hash) values ( ?1, ?2, ?3, ?4 )", id, 0, salt_string, hash_string)
-        .execute(&mut *transaction)
-        .await?;
+    query!(
+        "insert into passwd ( user_id, algo, salt, pass_hash) values ( ?1, ?2, ?3, ?4 )",
+        id,
+        0,
+        salt_string,
+        hash_string
+    )
+    .execute(&mut *transaction)
+    .await?;
 
     transaction.commit().await?;
 
     Ok(id)
 }
 
-
-pub (crate) async fn login_user(pool: &Pool<Sqlite>, username: String, passwd: String) -> anyhow::Result<i64> {
+pub(crate) async fn login_user(
+    pool: &Pool<Sqlite>,
+    username: String,
+    passwd: String,
+) -> anyhow::Result<i64> {
     let mut conn = pool.acquire().await?;
 
     let rec = query!("select passwd.user_id, passwd.algo, passwd.options, passwd.salt, passwd.pass_hash from user inner join passwd on user.id = passwd.user_id where user.username = ?1", username)
@@ -61,13 +83,16 @@ pub (crate) async fn login_user(pool: &Pool<Sqlite>, username: String, passwd: S
 
     let hash_str = String::from_utf8_lossy(&rec.pass_hash);
 
-    let parsed_hash = PasswordHash::new(&hash_str).map_err(|_| anyhow::Error::msg("passwd hash failed to parse"))?;
-    Argon2::default().verify_password(passwd.as_bytes(), &parsed_hash).map_err(|_| anyhow::Error::msg("passwd failed to verify"))?;
+    let parsed_hash = PasswordHash::new(&hash_str)
+        .map_err(|_| anyhow::Error::msg("passwd hash failed to parse"))?;
+    Argon2::default()
+        .verify_password(passwd.as_bytes(), &parsed_hash)
+        .map_err(|_| anyhow::Error::msg("passwd failed to verify"))?;
 
     Ok(rec.user_id)
 }
 
-pub (crate) async fn get_games(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<String>> {
+pub(crate) async fn get_games(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<String>> {
     let mut conn = pool.acquire().await?;
 
     let games: Vec<String> = query!("select game_name from game")
@@ -80,7 +105,7 @@ pub (crate) async fn get_games(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<String
     Ok(games)
 }
 
-pub (crate) async fn make_user_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<()> {
+pub(crate) async fn make_user_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<()> {
     let mut conn = pool.acquire().await?;
 
     query!("insert into administrator (user_id) values ( ?1 )", id)
@@ -90,7 +115,7 @@ pub (crate) async fn make_user_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Re
     Ok(())
 }
 
-pub (crate) async fn user_is_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<bool> {
+pub(crate) async fn user_is_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<bool> {
     let mut conn = pool.acquire().await?;
 
     let is_admin = query!("select * from administrator where user_id = ?1", id)
@@ -102,7 +127,7 @@ pub (crate) async fn user_is_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Resu
     Ok(is_admin)
 }
 
-pub (crate) async fn create_game(pool: &Pool<Sqlite>, name: String) -> anyhow::Result<i64> {
+pub(crate) async fn create_game(pool: &Pool<Sqlite>, name: String) -> anyhow::Result<i64> {
     let mut conn = pool.acquire().await?;
 
     let id = query!("insert into game (game_name) values ( ?1 )", name)
@@ -113,7 +138,7 @@ pub (crate) async fn create_game(pool: &Pool<Sqlite>, name: String) -> anyhow::R
     Ok(id)
 }
 
-pub (crate) async fn create_end_code(pool: &Pool<Sqlite>, name: String) -> anyhow::Result<i64> {
+pub(crate) async fn create_end_code(pool: &Pool<Sqlite>, name: String) -> anyhow::Result<i64> {
     let mut conn = pool.acquire().await?;
 
     let id = query!("insert into game_code (code) values ( ?1 )", name)
