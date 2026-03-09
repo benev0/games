@@ -8,10 +8,9 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
 };
-use axum_extra::extract::{
-    CookieJar, Form, PrivateCookieJar,
-    cookie::{Cookie, Key},
-};
+use axum_extra::{extract::{
+    CookieJar, Form, PrivateCookieJar, cookie::{Cookie, Key}
+}};
 use axum_htmx::HxBoosted;
 use minijinja::{Environment, path_loader};
 use once_cell::sync::Lazy;
@@ -24,7 +23,7 @@ use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::database::{
-    create_game, create_user, get_games, login_user, make_user_admin, user_is_admin,
+    create_game, create_user, get_games, get_username, login_user, make_user_admin, user_is_admin
 };
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
@@ -106,7 +105,8 @@ async fn main() {
         .nest("/admin", admin_routes)
         .merge(protected_routes)
         .merge(public_routes)
-        // todo: protect csrf
+        // todo: protect csrf better
+        // use in order of preference low to high origin headers, double cookie submit or http3
         .layer(CatchPanicLayer::new())
         .layer(TraceLayer::new_for_http());
 
@@ -126,7 +126,6 @@ fn init_tracing() {
 fn get_user_id(jar: PrivateCookieJar) -> anyhow::Result<i64> {
     let auth = jar
         .get("auth")
-        // .and_then(|cookie| PrivateCookieJar::new(key).decrypt(cookie.clone()))
         .ok_or(anyhow::Error::msg("failed to retrieve valid cookie"))?;
 
     auth.value().parse().map_err(anyhow::Error::from)
@@ -209,7 +208,7 @@ async fn signup_submit(
     jar: PrivateCookieJar,
     Form(signup_data): Form<Signup>,
 ) -> (PrivateCookieJar, Response) {
-    // give cookie and redirect to "/"" on success (htmx and standard flavors)
+    // give cookie and redirect to "/" on success (htmx and standard flavors)
     // stay on login on failure (htmx and standard flavors)
     if signup_data.passwd != signup_data.confirm_passwd {
         return (
@@ -249,8 +248,14 @@ async fn games(State(state): State<SiteState>, HxBoosted(hx_boosted): HxBoosted)
     decide_htmx(hx_boosted, "games", context! { games => game_list })
 }
 
-async fn profile(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
-    decide_htmx(hx_boosted, "profile", context! {})
+async fn profile(
+    State(state): State<SiteState>,
+    HxBoosted(hx_boosted): HxBoosted,
+    jar: PrivateCookieJar,
+) -> Html<String> {
+    let id = get_user_id(jar).unwrap();
+    let username = get_username(&state.database, id).await.unwrap_or("Unknown Username".to_owned());
+    decide_htmx(hx_boosted, "profile", context! { username => username })
 }
 
 async fn settings(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {

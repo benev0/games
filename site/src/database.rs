@@ -105,6 +105,16 @@ pub(crate) async fn get_games(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<String>
     Ok(games)
 }
 
+pub(crate) async fn get_username(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<String> {
+    let mut conn = pool.acquire().await?;
+
+    let username = query!("select username from user where id = ?1", id)
+        .fetch_one(&mut *conn)
+        .await?;
+
+    Ok(username.username)
+}
+
 pub(crate) async fn make_user_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<()> {
     let mut conn = pool.acquire().await?;
 
