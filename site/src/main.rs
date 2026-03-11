@@ -23,7 +23,7 @@ use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::database::{
-    create_game, create_user, get_games, get_username, login_user, make_user_admin, user_is_admin
+    create_game, create_user, get_games, get_username, login_user, make_user_admin, user_exists, user_is_admin
 };
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
@@ -161,7 +161,7 @@ async fn require_auth(
     request: Request,
     next: Next,
 ) -> Response {
-    let _auth = if let Some(auth) = jar
+    let auth = if let Some(auth) = jar
         .get("auth")
         .and_then(|cookie| PrivateCookieJar::new(state.key).decrypt(cookie.clone()))
     {
@@ -170,9 +170,13 @@ async fn require_auth(
         return Redirect::to("/login").into_response();
     };
 
-    // todo: check db
-
-    next.run(request).await
+    if let Ok(auth) = auth.value().parse()
+        && let Ok(true) = user_exists(&state.database, auth).await
+    {
+        next.run(request).await
+    } else {
+        Redirect::to("/login").into_response()
+    }
 }
 
 async fn login_submit(

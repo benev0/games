@@ -6,8 +6,7 @@ use argon2::{
 };
 use chrono::Utc;
 use sqlx::{
-    Pool, Sqlite, query,
-    sqlite::{self, SqlitePool},
+    Pool, Sqlite, query, query_scalar, sqlite::{self, SqlitePool}
 };
 
 pub(crate) async fn initialize() -> anyhow::Result<Pool<Sqlite>> {
@@ -103,6 +102,17 @@ pub(crate) async fn get_games(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<String>
         .collect();
 
     Ok(games)
+}
+
+pub(crate) async fn user_exists(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<bool> {
+    let mut conn = pool.acquire().await?;
+
+    let user_exists: _ = query_scalar!("select exists(select 1 from user where id = ?1) as \"exists!: bool\"", id)
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap_or(false);
+
+    Ok(user_exists)
 }
 
 pub(crate) async fn get_username(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<String> {
