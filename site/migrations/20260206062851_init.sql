@@ -23,13 +23,17 @@ create table if not exists administrator (
 
 create table if not exists game (
     id integer primary key,
-    game_name varchar(255) not null
+    game_name varchar(255) not null,
+    game_description text not null
 );
 
 create table if not exists game_event (
     id integer primary key,
+    game_id integer not null,
     event_name varchar(255) not null,
-    created integer not null
+    created integer not null,
+    event_description text not null,
+    foreign key (game_id) references game(id)
 );
 
 create table if not exists user_submitted_bot (

@@ -1,4 +1,13 @@
 <form action="/admin/event" method="post">
   <label for="name">event name:</label><br>
   <input type="text" id="name" name="name"><br>
+  <label for="game">game id:</label><br>
+  <select id="game" name="game">
+  {% for game in games %}
+    <option value="{{ game.id }}">{{ game.name }}</option>
+  {% endfor %}
+  </select>
+  <label for="description">game description:</label><br>
+  <textarea name="description" id="description" cols="40" rows="5"></textarea><br>
+  <input type="submit">
 </form>

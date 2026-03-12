@@ -5,9 +5,23 @@ use argon2::{
     password_hash::{SaltString, rand_core},
 };
 use chrono::Utc;
+use serde::Serialize;
 use sqlx::{
     Pool, Sqlite, query, query_scalar, sqlite::{self, SqlitePool}
 };
+
+#[derive(Serialize, Debug)]
+pub(crate) struct Game {
+    id: i64,
+    name: String,
+    description: String,
+}
+
+impl Game {
+    fn new(id: i64, name: String, description: String) -> Self {
+        Self { id, name, description}
+    }
+}
 
 pub(crate) async fn initialize() -> anyhow::Result<Pool<Sqlite>> {
     let options = sqlite::SqliteConnectOptions::from_str(&std::env::var("DATABASE_URL")?)?
@@ -91,14 +105,14 @@ pub(crate) async fn login_user(
     Ok(rec.user_id)
 }
 
-pub(crate) async fn get_games(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<String>> {
+pub(crate) async fn get_games(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<Game>> {
     let mut conn = pool.acquire().await?;
 
-    let games: Vec<String> = query!("select game_name from game")
+    let games: Vec<Game> = query!("select * from game")
         .fetch_all(&mut *conn)
         .await?
         .into_iter()
-        .map(|rec| rec.game_name)
+        .map(|rec| Game::new(rec.id, rec.game_name, rec.game_description))
         .collect();
 
     Ok(games)
@@ -147,10 +161,57 @@ pub(crate) async fn user_is_admin(pool: &Pool<Sqlite>, id: i64) -> anyhow::Resul
     Ok(is_admin)
 }
 
-pub(crate) async fn create_game(pool: &Pool<Sqlite>, name: String) -> anyhow::Result<i64> {
+pub(crate) async fn get_game_with_name(pool: &Pool<Sqlite>, name: &str) -> anyhow::Result<(i64, String)> {
     let mut conn = pool.acquire().await?;
 
-    let id = query!("insert into game (game_name) values ( ?1 )", name)
+    let res = query!("select * from game where game_name = ?1", name)
+        .fetch_one(&mut *conn)
+        .await?;
+
+    Ok((res.id, res.game_description))
+}
+
+pub(crate) async fn get_event_with_name(pool: &Pool<Sqlite>, name: &str) -> anyhow::Result<(i64, String, i64, i64, String)> {
+    let mut conn = pool.acquire().await?;
+
+    let res = query!("select * from game_event where event_name = ?1", name)
+        .fetch_optional(&mut *conn)
+        .await?
+        .unwrap();
+
+    Ok((res.id, res.event_name, res.created, res.game_id, res.event_description))
+}
+
+pub(crate) async fn get_all_event_names(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<String>> {
+    let mut conn = pool.acquire().await?;
+
+    let res = query!("select event_name from game_event")
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .map(|e| e.event_name)
+        .collect();
+
+    Ok(res)
+}
+
+pub(crate) async fn get_game_event_names(pool: &Pool<Sqlite>, game: &str) -> anyhow::Result<Vec<String>> {
+    let mut conn = pool.acquire().await?;
+
+    let res = query!("select event_name from game_event inner join game on game_event.game_id = game.id where game.game_name = ?1", game)
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .map(|e| e.event_name)
+        .collect();
+
+    Ok(res)
+}
+
+pub(crate) async fn create_end_code(pool: &Pool<Sqlite>, name: &str) -> anyhow::Result<i64> {
+    let mut conn = pool.acquire().await?;
+
+    let id = query!("insert into game_code (code) values ( ?1 )", name)
         .execute(&mut *conn)
         .await?
         .last_insert_rowid();
@@ -158,10 +219,21 @@ pub(crate) async fn create_game(pool: &Pool<Sqlite>, name: String) -> anyhow::Re
     Ok(id)
 }
 
-pub(crate) async fn create_end_code(pool: &Pool<Sqlite>, name: String) -> anyhow::Result<i64> {
+pub(crate) async fn create_event(pool: &Pool<Sqlite>, name: &str, for_game: i64, description: &str) -> anyhow::Result<i64> {
     let mut conn = pool.acquire().await?;
 
-    let id = query!("insert into game_code (code) values ( ?1 )", name)
+    let id = query!("insert into game_event (game_id, event_name, created, event_description) values ( ?1, ?2, ?3, ?4 )", for_game, name, 0, description)
+        .execute(&mut *conn)
+        .await?
+        .last_insert_rowid();
+
+    Ok(id)
+}
+
+pub(crate) async fn create_game(pool: &Pool<Sqlite>, name: &str, description: &str) -> anyhow::Result<i64> {
+    let mut conn = pool.acquire().await?;
+
+    let id = query!("insert into game (game_name, game_description) values ( ?1, ?2 )", name, description)
         .execute(&mut *conn)
         .await?
         .last_insert_rowid();

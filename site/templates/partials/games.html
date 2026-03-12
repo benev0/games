@@ -2,6 +2,6 @@
 
 <ul hx-boost="true" hx-target="#page-content" hx-push-url="true">
 {% for game in games %}
-  <li><a href="/games/{{ game }}">{{ game }}</a></li>
+  <li><a href="/games/{{ game.name }}">{{ game.name }}</a></li>
 {% endfor %}
 </ul>

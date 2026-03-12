@@ -23,7 +23,7 @@ use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::database::{
-    create_game, create_user, get_games, get_username, login_user, make_user_admin, user_exists, user_is_admin
+    create_end_code, create_event, create_game, create_user, get_all_event_names, get_event_with_name, get_game_event_names, get_game_with_name, get_games, get_username, login_user, make_user_admin, user_exists, user_is_admin
 };
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
@@ -57,8 +57,25 @@ struct Signup {
     confirm_passwd: String,
 }
 
+// forum data
 #[derive(Deserialize, Debug)]
-struct Name {
+struct GameInfo {
+    name: String,
+    description: String,
+}
+
+// forum data
+#[derive(Deserialize, Debug)]
+struct EventInfo {
+    name: String,
+    game: i64,
+    // add creation time
+    description: String,
+}
+
+// forum data
+#[derive(Deserialize, Debug)]
+struct EndCodeInfo {
     name: String,
 }
 
@@ -81,23 +98,26 @@ async fn main() {
         .route("/signup", get(signup))
         .route("/signup", post(signup_submit))
         .with_state(state.clone());
-    // todo: require no auth?
 
     let protected_routes = Router::new()
         .route("/", get(games))
         .route("/profile", get(profile))
         .route("/settings", get(settings))
         .route("/games/{game}", get(specific_game))
-        .route("/admin", get(admin))
-        .route("/admin", post(make_admin))
+        .route("/events", get(events))
+        .route("/event/{event_name}", get(event))
+        .route("/adminme", get(admin))
+        .route("/adminme", post(make_admin))
         .with_state(state.clone())
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
     let admin_routes = Router::new()
         .route("/game", get(admin_game))
         .route("/game", post(admin_make_game))
-        // .route("/end-code", method_router)
-        // .route("/event", )
+        .route("/event", get(admin_event))
+        .route("/event", post(admin_make_event))
+        .route("/end-code", get(admin_end_code))
+        .route("/end-code", post(admin_make_end_code))
         .with_state(state.clone())
         .layer(middleware::from_fn_with_state(state, require_admin));
 
@@ -106,7 +126,7 @@ async fn main() {
         .merge(protected_routes)
         .merge(public_routes)
         // todo: protect csrf better
-        // use in order of preference low to high origin headers, double cookie submit or http3
+        // use in order of preference low to high: origin headers, double cookie submit, or http3
         .layer(CatchPanicLayer::new())
         .layer(TraceLayer::new_for_http());
 
@@ -267,11 +287,31 @@ async fn settings(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
 }
 
 async fn specific_game(
+    State(state): State<SiteState>,
     Path(game_name): Path<String>,
     HxBoosted(hx_boosted): HxBoosted,
 ) -> Html<String> {
     // todo: fetch content from db
-    decide_htmx(hx_boosted, "games_", context! { game => game_name })
+    let (_id, description) = get_game_with_name(&state.database, &game_name).await.unwrap_or((0, "game not found".to_string()));
+    let event_names = get_game_event_names(&state.database, &game_name).await.unwrap();
+    decide_htmx(hx_boosted, "games_", context! { game => game_name, description => description, events => event_names})
+}
+
+async fn events(
+    State(state): State<SiteState>,
+    HxBoosted(hx_boosted): HxBoosted,
+) -> Html<String> {
+    let event_names = get_all_event_names(&state.database).await.unwrap();
+    decide_htmx(hx_boosted, "events", context! { events => event_names })
+}
+
+async fn event(
+    State(state): State<SiteState>,
+    Path(event_name): Path<String>,
+    HxBoosted(hx_boosted): HxBoosted,
+) -> Html<String> {
+    let event_data = get_event_with_name(&state.database, &event_name).await.unwrap();
+    decide_htmx(hx_boosted, "event_", context! { event_name => event_data.1, event_description => event_data.4 })
 }
 
 async fn admin_game(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
@@ -280,10 +320,43 @@ async fn admin_game(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
 
 async fn admin_make_game(
     State(state): State<SiteState>,
-    HxBoosted(_hx_boosted): HxBoosted,
-    Form(game): Form<Name>,
+    Form(game): Form<GameInfo>,
 ) -> StatusCode {
-    match create_game(&state.database, game.name).await {
+    match create_game(&state.database, &game.name, &game.description).await {
+        Ok(_) => StatusCode::CREATED,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+async fn admin_event(
+    State(state): State<SiteState>,
+    HxBoosted(hx_boosted): HxBoosted
+) -> Html<String> {
+    let games = get_games(&state.database).await.unwrap();
+    decide_htmx(hx_boosted, "admin/event", context! { games => games })
+}
+
+async fn admin_make_event(
+    State(state): State<SiteState>,
+    Form(event): Form<EventInfo>,
+) -> StatusCode {
+    match create_event(&state.database, &event.name, event.game, &event.description).await {
+        Ok(_) => StatusCode::CREATED,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+async fn admin_end_code(
+    HxBoosted(hx_boosted): HxBoosted
+) -> Html<String> {
+    decide_htmx(hx_boosted, "admin/end_code", context! {})
+}
+
+async fn admin_make_end_code(
+    State(state): State<SiteState>,
+    Form(end_code): Form<EndCodeInfo>,
+) -> StatusCode {
+    match create_end_code(&state.database, &end_code.name).await {
         Ok(_) => StatusCode::CREATED,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
