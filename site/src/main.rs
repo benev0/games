@@ -2,19 +2,21 @@ mod database;
 
 use axum::{
     Router,
-    extract::{FromRef, Path, Request, State},
+    extract::{FromRef, Path, Request, State, Multipart},
     http::StatusCode,
     middleware::{self, Next},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
 };
-use axum_extra::{extract::{
+use axum_extra::extract::{
     CookieJar, Form, PrivateCookieJar, cookie::{Cookie, Key}
-}};
+};
 use axum_htmx::HxBoosted;
+use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use minijinja::{Environment, path_loader};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use sha3::{Digest, Sha3_512};
 use sqlx::{Pool, Sqlite};
 use tokio::net::TcpListener;
 
@@ -23,7 +25,7 @@ use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::database::{
-    create_end_code, create_event, create_game, create_user, get_all_event_names, get_event_with_name, get_game_event_names, get_game_with_name, get_games, get_username, login_user, make_user_admin, user_exists, user_is_admin
+    create_end_code, create_event, create_game, create_user, create_user_submitted_bot_for_event, get_all_event_names, get_bots_from_user, get_event_with_name, get_game_event_names, get_game_with_name, get_games, get_username, login_user, make_user_admin, user_exists, user_is_admin
 };
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
@@ -106,6 +108,7 @@ async fn main() {
         .route("/games/{game}", get(specific_game))
         .route("/events", get(events))
         .route("/event/{event_name}", get(event))
+        .route("/event/{event_name}", post(submit_new_bot_for_event))
         .route("/adminme", get(admin))
         .route("/adminme", post(make_admin))
         .with_state(state.clone())
@@ -279,7 +282,14 @@ async fn profile(
 ) -> Html<String> {
     let id = get_user_id(jar).unwrap();
     let username = get_username(&state.database, id).await.unwrap_or("Unknown Username".to_owned());
-    decide_htmx(hx_boosted, "profile", context! { username => username })
+    let bots: Vec<String> = get_bots_from_user(&state.database, id)
+        .await
+        .unwrap_or(Vec::new())
+        .iter()
+        .map(|raw_hash| URL_SAFE.encode(raw_hash))
+        .collect();
+
+    decide_htmx(hx_boosted, "profile", context! { username => username, bot_submissions => bots })
 }
 
 async fn settings(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
@@ -311,7 +321,35 @@ async fn event(
     HxBoosted(hx_boosted): HxBoosted,
 ) -> Html<String> {
     let event_data = get_event_with_name(&state.database, &event_name).await.unwrap();
-    decide_htmx(hx_boosted, "event_", context! { event_name => event_data.1, event_description => event_data.4 })
+    decide_htmx(hx_boosted, "event_", context! { event => event_data })
+}
+
+async fn submit_new_bot_for_event(
+    State(state): State<SiteState>,
+    Path(event_name): Path<String>,
+    HxBoosted(_hx_boosted): HxBoosted,
+    jar: PrivateCookieJar,
+    mut multipart: Multipart
+) -> Html<String> {
+    let user_id = get_user_id(jar).unwrap();
+
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        if let Some("bot") = field.name() {
+            let data = field.bytes().await.unwrap();
+            let mut hasher = Sha3_512::new();
+            hasher.update(&data);
+            let hash = hasher.finalize();
+            let filename = URL_SAFE.encode(hash);
+
+            // fixme: most jank early return
+            let _ = tokio::fs::write(format!("./bots/{}.wasm", filename), &data).await.unwrap();
+
+            // todo: should also bind to event as well
+            let _ = create_user_submitted_bot_for_event(&state.database, &hash, 0, user_id, &event_name).await.unwrap();
+            return Html("success".to_string());
+        }
+    }
+    Html("failure".to_string())
 }
 
 async fn admin_game(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {

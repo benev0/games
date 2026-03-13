@@ -1,3 +1,13 @@
-<h1>{{ event_name }}</h1>
+<h1>{{ event.name }}</h1>
 
-<p>{{ event_description }}</p>
+<form
+  action="/event/{{ event.name }}"
+  method="post"
+  enctype="multipart/form-data"
+>
+  <label for="bot">Chose file to upload:</label><br>
+  <input type="file" name="bot" id="bot" multiple="false" accept=".wasm"/><br>
+  <input type="submit">
+</form>
+
+<p>{{ event.description }}</p>

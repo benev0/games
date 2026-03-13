@@ -23,6 +23,21 @@ impl Game {
     }
 }
 
+#[derive(Serialize, Debug)]
+pub(crate) struct Event {
+    id: i64,
+    game_id: i64,
+    created: i64,
+    name: String,
+    description: String,
+}
+
+impl Event {
+    fn new(id: i64, game_id: i64, created: i64, name: String, description: String) -> Self {
+        Self { id, game_id, created, name, description }
+    }
+}
+
 pub(crate) async fn initialize() -> anyhow::Result<Pool<Sqlite>> {
     let options = sqlite::SqliteConnectOptions::from_str(&std::env::var("DATABASE_URL")?)?
         .foreign_keys(true)
@@ -171,7 +186,7 @@ pub(crate) async fn get_game_with_name(pool: &Pool<Sqlite>, name: &str) -> anyho
     Ok((res.id, res.game_description))
 }
 
-pub(crate) async fn get_event_with_name(pool: &Pool<Sqlite>, name: &str) -> anyhow::Result<(i64, String, i64, i64, String)> {
+pub(crate) async fn get_event_with_name(pool: &Pool<Sqlite>, name: &str) -> anyhow::Result<Event> {
     let mut conn = pool.acquire().await?;
 
     let res = query!("select * from game_event where event_name = ?1", name)
@@ -179,7 +194,7 @@ pub(crate) async fn get_event_with_name(pool: &Pool<Sqlite>, name: &str) -> anyh
         .await?
         .unwrap();
 
-    Ok((res.id, res.event_name, res.created, res.game_id, res.event_description))
+    Ok(Event::new(res.id, res.game_id, res.created, res.event_name, res.event_description))
 }
 
 pub(crate) async fn get_all_event_names(pool: &Pool<Sqlite>) -> anyhow::Result<Vec<String>> {
@@ -239,4 +254,32 @@ pub(crate) async fn create_game(pool: &Pool<Sqlite>, name: &str, description: &s
         .last_insert_rowid();
 
     Ok(id)
+}
+
+pub(crate) async fn create_user_submitted_bot_for_event(pool: &Pool<Sqlite>, hash: &[u8], created: i64, user_id: i64, event_name: &str) -> anyhow::Result<i64> {
+    let mut conn = pool.acquire().await?;
+
+    let id = query!("insert into user_submitted_bot ( bot_hash, created, user_id, game_id) values ( ?1, ?2, ?3, (select game_id from game_event where event_name = ?4) )",
+        hash,
+        created,
+        user_id,
+        event_name,)
+        .execute(&mut *conn)
+        .await?
+        .last_insert_rowid();
+
+    Ok(id)
+}
+
+pub(crate) async fn get_bots_from_user(pool: &Pool<Sqlite>, id: i64) -> anyhow::Result<Vec<Vec<u8>>> {
+    let mut conn = pool.acquire().await?;
+
+    let bot_hashes = query!("select bot_hash from user_submitted_bot where user_id = ?1", id)
+        .fetch_all(&mut *conn)
+        .await?
+        .into_iter()
+        .map(|rec| rec.bot_hash)
+        .collect();
+
+    Ok(bot_hashes)
 }

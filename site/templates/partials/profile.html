@@ -1,1 +1,8 @@
 <h1>Welcome {{username}}</h1>
+
+<h2>Bots listed below</h2>
+<ul>
+{% for bot in bot_submissions %}
+  <li>{{ bot }}</li>
+{% endfor %}
+</ul>
