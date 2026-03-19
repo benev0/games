@@ -30,7 +30,7 @@ create table if not exists game (
 create table if not exists game_event (
     id integer primary key,
     game_id integer not null,
-    event_name varchar(255) not null,
+    event_name varchar(255) not null unique,
     created integer not null,
     event_description text not null,
     foreign key (game_id) references game(id)
@@ -58,7 +58,6 @@ create table if not exists bot_participates_in_event (
     foreign key (bot_id) references user_submitted_bot(id),
     foreign key (event_id) references game_event(id),
     primary key (bot_id, event_id) on conflict rollback
-
 ) without rowid;
 
 create table if not exists competed_against (

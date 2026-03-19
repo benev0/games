@@ -25,7 +25,7 @@ use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::database::{
-    create_end_code, create_event, create_game, create_user, create_user_submitted_bot_for_event, get_all_event_names, get_bots_from_user, get_event_with_name, get_game_event_names, get_game_with_name, get_games, get_username, login_user, make_user_admin, user_exists, user_is_admin
+    create_end_code, create_event, create_game, create_user, create_user_submitted_bot_for_event, get_all_event_names, get_bots_from_event_and_user, get_bots_from_user, get_event_with_name, get_game_event_names, get_game_with_name, get_games, get_username, login_user, make_user_admin, user_exists, user_is_admin
 };
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
@@ -282,14 +282,14 @@ async fn profile(
 ) -> Html<String> {
     let id = get_user_id(jar).unwrap();
     let username = get_username(&state.database, id).await.unwrap_or("Unknown Username".to_owned());
-    let bots: Vec<String> = get_bots_from_user(&state.database, id)
+    let bot_hashes: Vec<String> = get_bots_from_user(&state.database, id)
         .await
         .unwrap_or(Vec::new())
         .iter()
-        .map(|raw_hash| URL_SAFE.encode(raw_hash))
+        .map(|bot| URL_SAFE.encode(&bot.bot_hash))
         .collect();
 
-    decide_htmx(hx_boosted, "profile", context! { username => username, bot_submissions => bots })
+    decide_htmx(hx_boosted, "profile", context! { username => username, bot_submissions => bot_hashes })
 }
 
 async fn settings(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
@@ -319,9 +319,13 @@ async fn event(
     State(state): State<SiteState>,
     Path(event_name): Path<String>,
     HxBoosted(hx_boosted): HxBoosted,
+    jar: PrivateCookieJar,
 ) -> Html<String> {
+    let user_id = get_user_id(jar).unwrap(); // should be a 400 range error on fail
     let event_data = get_event_with_name(&state.database, &event_name).await.unwrap();
-    decide_htmx(hx_boosted, "event_", context! { event => event_data })
+    let submissions = get_bots_from_event_and_user(&state.database, event_data.id, user_id).await.unwrap();
+    let available_bots = get_bots_from_user(&state.database, user_id).await.unwrap();
+    decide_htmx(hx_boosted, "event_", context! { event => event_data, submissions => submissions, available_bots => available_bots })
 }
 
 async fn submit_new_bot_for_event(

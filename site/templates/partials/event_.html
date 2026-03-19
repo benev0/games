@@ -1,13 +1,37 @@
 <h1>{{ event.name }}</h1>
 
-<form
-  action="/event/{{ event.name }}"
-  method="post"
-  enctype="multipart/form-data"
->
-  <label for="bot">Chose file to upload:</label><br>
-  <input type="file" name="bot" id="bot" multiple="false" accept=".wasm"/><br>
-  <input type="submit">
-</form>
+{% if submissions %}
+  <!-- {% for bot_id in submissions %}
+    <form
+      action="/event/{{ event.name }}/{{ bot_id }}"
+      method="delete"
+    >
+      <label for="delete-bot">Delete submission for bot {{ bot_id }}</label>
+      <input type="submit" name="delete-bot", id="delete-bot">
+    </form>
+  {% endfor %} -->
+{% else %}
+  <form
+    action="/event/{{ event.name }}"
+    method="post"
+    enctype="multipart/form-data"
+  >
+    <label for="bot">Chose file to upload:</label><br>
+    <input type="file" name="bot" id="bot" multiple="false" accept=".wasm"/><br>
+    <input type="submit">
+  </form>
+
+  <form
+    action="/event/{{ event.name }}"
+    method="patch"
+  >
+    <label for="bot-selector">select bot to enter into the event</label>
+    <select name="bot-selector" id="bot-selector">
+    {% for bot_id in submissions %}
+      <option value="{{ bot_id }}">{{ bot_id }}</option>
+    {% endfor %}
+    </select>
+  </form>
+{% endif %}
 
 <p>{{ event.description }}</p>
