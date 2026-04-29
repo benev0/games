@@ -27,8 +27,8 @@
   >
     <label for="bot-selector">select bot to enter into the event</label>
     <select name="bot-selector" id="bot-selector">
-    {% for bot_id in submissions %}
-      <option value="{{ bot_id }}">{{ bot_id }}</option>
+    {% for bot in available_bots %}
+      <option value="{{ bot.id }}">{{ bot.id }}</option>
     {% endfor %}
     </select>
   </form>

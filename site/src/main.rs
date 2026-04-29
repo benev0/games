@@ -18,7 +18,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_512};
 use sqlx::{Pool, Sqlite};
-use tokio::net::TcpListener;
+use tokio::{io::AsyncWriteExt, net::TcpListener};
 
 use minijinja::context;
 use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
@@ -345,10 +345,20 @@ async fn submit_new_bot_for_event(
             let hash = hasher.finalize();
             let filename = URL_SAFE.encode(hash);
 
-            // fixme: most jank early return
+            match tokio::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(format!("./bots/{}.wasm", filename))
+                .await
+            {
+                Ok(mut file) => {
+                    let _ = file.write(&data).await;
+                },
+                Err(_) => {},
+            }
+
             let _ = tokio::fs::write(format!("./bots/{}.wasm", filename), &data).await.unwrap();
 
-            // todo: should also bind to event as well
             let _ = create_user_submitted_bot_for_event(&state.database, &hash, 0, user_id, &event_name).await.unwrap();
             return Html("success".to_string());
         }

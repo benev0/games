@@ -211,7 +211,7 @@ pub(crate) async fn get_event_with_name(pool: &SqlitePool, name: &str) -> anyhow
         .await?
         .unwrap();
 
-    Ok(Event::new(res.id, res.game_id, res.created, res.event_name, res.event_description))
+    Ok(Event::new(res.id.expect("games should have id"), res.game_id, res.created, res.event_name, res.event_description))
 }
 
 pub(crate) async fn get_all_event_names(pool: &SqlitePool) -> anyhow::Result<Vec<String>> {
