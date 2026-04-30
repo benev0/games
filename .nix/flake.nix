@@ -26,13 +26,6 @@
             glibc
           ];
 
-
-          # # Provide libclang for flecs
-          # LIBCLANG_PATH = lib.makeLibraryPath [ libclang ];
-
-          # # Provide libc for flecs
-          # CPATH = lib.makeSearchPathOutput "dev" "include" buildInputs;
-
           LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
 
           DATABASE_URL = "sqlite:games.db";

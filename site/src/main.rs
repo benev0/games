@@ -301,7 +301,6 @@ async fn specific_game(
     Path(game_name): Path<String>,
     HxBoosted(hx_boosted): HxBoosted,
 ) -> Html<String> {
-    // todo: fetch content from db
     let (_id, description) = get_game_with_name(&state.database, &game_name).await.unwrap_or((0, "game not found".to_string()));
     let event_names = get_game_event_names(&state.database, &game_name).await.unwrap();
     decide_htmx(hx_boosted, "games_", context! { game => game_name, description => description, events => event_names})
