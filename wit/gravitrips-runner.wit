@@ -1,0 +1,24 @@
+package games:gravitrips@0.1.0;
+
+
+interface player-a {
+    use types.{board};
+    make-move: func(game-state: board) -> u8;
+}
+
+interface player-b {
+    use types.{board};
+    make-move: func(game-state: board) -> u8;
+}
+
+interface runner {
+    run: func() -> u64;
+}
+
+world gravitrips-runner {
+    import player-a;
+    import player-b;
+
+    export types;
+    export runner;
+}

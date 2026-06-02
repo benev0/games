@@ -1,14 +1,19 @@
 package games:gravitrips@0.1.0;
 
-interface next-move {
+interface types {
     record board {
         heights: list<u8>,
         columns: list<u8>,
     }
+}
+
+interface next-move {
+    use types.{board};
 
     make-move: func(game-state: board) -> u8;
 }
 
 world gravitrips {
+    export types;
     export next-move;
 }

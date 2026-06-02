@@ -1,6 +1,7 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    # nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -18,9 +19,15 @@
           buildInputs = [
             (rust-bin.stable.latest.minimal.override {
               extensions = [ "clippy" "rust-analyzer" "rust-docs" "rust-src" ];
-              targets = ["wasm32-unknown-unknown" "wasm32-wasip1" "wasm32-wasip2"];
+              targets = ["wasm32-wasip2"];
             })
             (rust-bin.selectLatestNightlyWith (toolchain: toolchain.rustfmt))
+
+            openssl
+            pkg-config
+            eza
+            fd
+            wasm-tools
 
             sqlx-cli
             glibc
