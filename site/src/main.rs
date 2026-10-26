@@ -34,6 +34,24 @@ static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
     env
 });
 
+// todo: this needs to be data in the future
+enum GameIDS {
+    Gravitrips = 1,
+    Chess = 2,
+}
+
+impl TryFrom<u64> for GameIDS {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(GameIDS::Gravitrips),
+            2 => Ok(GameIDS::Chess),
+            _ => Err(anyhow::Error::msg("game does not exist")),
+        }
+    }
+}
+
 #[derive(Clone)]
 struct SiteState {
     key: Key,
@@ -81,6 +99,14 @@ struct EndCodeInfo {
     name: String,
 }
 
+// forum data
+#[derive(Deserialize, Debug)]
+struct DualData {
+    game: u64,
+    bot1: String,
+    bot2: String,
+}
+
 #[tokio::main]
 async fn main() {
     init_tracing();
@@ -106,6 +132,7 @@ async fn main() {
         .route("/profile", get(profile))
         .route("/settings", get(settings))
         .route("/games/{game}", get(specific_game))
+        .route("/dual", post(dual))
         .route("/events", get(events))
         .route("/event/{event_name}", get(event))
         .route("/event/{event_name}", post(submit_new_bot_for_event))
@@ -289,7 +316,14 @@ async fn profile(
         .map(|bot| URL_SAFE.encode(&bot.bot_hash))
         .collect();
 
-    decide_htmx(hx_boosted, "profile", context! { username => username, bot_submissions => bot_hashes })
+    #[derive(Serialize)]
+    struct Game<'a> {
+        name: &'a str,
+        id: u64,
+    }
+    let games = vec![Game { name: "gravitrips", id: 1 }];
+
+    decide_htmx(hx_boosted, "profile", context! { username => username, bot_submissions => bot_hashes, games => games })
 }
 
 async fn settings(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
@@ -304,6 +338,15 @@ async fn specific_game(
     let (_id, description) = get_game_with_name(&state.database, &game_name).await.unwrap_or((0, "game not found".to_string()));
     let event_names = get_game_event_names(&state.database, &game_name).await.unwrap();
     decide_htmx(hx_boosted, "games_", context! { game => game_name, description => description, events => event_names})
+}
+
+async fn dual(
+    // State(state): State<SiteState>,
+    HxBoosted(hx_boosted): HxBoosted,
+    Form(dual): Form<DualData>,
+) -> Html<String> {
+    run_game(dual.game.try_into().unwrap(), &[&dual.bot1, &dual.bot2]).unwrap();
+    decide_htmx(hx_boosted, "dual", context! {})
 }
 
 async fn events(
@@ -431,7 +474,11 @@ async fn make_admin(
 ) -> Html<String> {
     let id = get_user_id(jar).unwrap();
 
-    let success = make_user_admin(&state.database, id).await.is_ok();
+    let success = if cfg!(feature = "admin-bootstrap") {
+        make_user_admin(&state.database, id).await.is_ok()
+    } else {
+        false
+    };
 
     decide_htmx(hx_boosted, "admin", context! {is_admin => success})
 }
@@ -448,4 +495,13 @@ where
     // todo: or 500 (switch to status result<html, status code>)
     let template = template.unwrap();
     Html(template.render(ctx).unwrap())
+}
+
+fn run_game(game: GameIDS, bots: &[&str]) -> Result<(), anyhow::Error> {
+    match game {
+        GameIDS::Gravitrips => {
+            gravitrips::main(&format!("bots/{}.wasm", bots[0]), &format!("bots/{}.wasm", bots[1]))
+        },
+        GameIDS::Chess => Err(anyhow::Error::msg("chess not implementted")),
+    }
 }

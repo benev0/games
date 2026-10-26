@@ -1,5 +1,3 @@
-use std::env;
-use std::num::Wrapping;
 use wasmtime::{component::*};
 use wasmtime::{Engine, Store};
 
@@ -184,17 +182,10 @@ impl Board {
     }
 }
 
-fn main() -> wasmtime::Result<()> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() != 3 {
-        println!("Expected two arguments. The paths of wasm modules: player 1 and player 2.");
-        return Ok(());
-    }
-
+pub fn main(player1: &str, player2: &str) -> wasmtime::Result<()> {
     let engine = Engine::default();
-    let p1_component = Component::from_file(&engine, args[1].clone())?;
-    let p2_component = Component::from_file(&engine, args[2].clone())?;
+    let p1_component = Component::from_file(&engine, player1)?;
+    let p2_component = Component::from_file(&engine, player2)?;
 
     let linker = Linker::new(&engine);
     let mut store = Store::new(&engine, ());
@@ -237,6 +228,7 @@ fn main() -> wasmtime::Result<()> {
     };
 
 
+    println!("game_over");
     dbg!(&board);
     dbg!(&win);
     dbg!(move_count + 1);

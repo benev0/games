@@ -1,0 +1,22 @@
+<form
+  action="/dual"
+  method="post"
+>
+  <label for="game">select the game</label>
+  <select name="game" id="game">
+  {% for game in games %}
+    <option value="{{ game.id }}">{{ game.name }}</option>
+  {% endfor %}
+  </select>
+  <label for="bot1">select bot to enter as player 1</label>
+  {% for bot in bot_submissions %}
+  <select name="bot1" id="bot1">
+    <option value="{{ bot }}">{{ bot }}</option>
+  </select>
+  <label for="bot2">select bot to enter as player 2</label>
+  <select name="bot2" id="bot2">
+    <option value="{{ bot }}">{{ bot }}</option>
+  </select>
+  {% endfor %}
+  <input type="submit" value="Submit">
+</form>

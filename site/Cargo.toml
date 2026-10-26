@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-only"
 
+[features]
+default = []
+admin-bootstrap = []
+
 [dependencies]
 axum = { workspace = true }
 tokio = { workspace = true }
@@ -22,3 +26,4 @@ axum-extra = { version = "0.12.5", features = ["cookie", "cookie-private", "form
 chrono = "0.4.43"
 sha3 = "0.10.8"
 base64 = "0.22.1"
+gravitrips = { workspace = true }
