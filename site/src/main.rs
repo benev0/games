@@ -125,6 +125,7 @@ async fn main() {
         .route("/login", post(login_submit))
         .route("/signup", get(signup))
         .route("/signup", post(signup_submit))
+        // todo: add middleware to purge bad cookies and redirect away when logged in
         .with_state(state.clone());
 
     let protected_routes = Router::new()
@@ -244,6 +245,7 @@ async fn login_submit(
                 Cookie::build(("auth", uid.to_string()))
                     .http_only(true)
                     .same_site(axum_extra::extract::cookie::SameSite::Strict)
+                    .secure(true)
                     .build(),
             );
 
@@ -277,6 +279,7 @@ async fn signup_submit(
                 Cookie::build(("auth", uid.to_string()))
                     .http_only(true)
                     .same_site(axum_extra::extract::cookie::SameSite::Strict)
+                    .secure(true)
                     .build(),
             );
 
@@ -345,8 +348,8 @@ async fn dual(
     HxBoosted(hx_boosted): HxBoosted,
     Form(dual): Form<DualData>,
 ) -> Html<String> {
-    run_game(dual.game.try_into().unwrap(), &[&dual.bot1, &dual.bot2]).unwrap();
-    decide_htmx(hx_boosted, "dual", context! {})
+    let winner = run_game(dual.game.try_into().unwrap(), &[&dual.bot1, &dual.bot2]).unwrap_or(0);
+    decide_htmx_multi(hx_boosted, "dual_result", "profile", context! { winner => winner })
 }
 
 async fn events(
@@ -497,11 +500,25 @@ where
     Html(template.render(ctx).unwrap())
 }
 
-fn run_game(game: GameIDS, bots: &[&str]) -> Result<(), anyhow::Error> {
+fn decide_htmx_multi<S>(htmx: bool, template: &str, template_degraded: &str, ctx: S) -> Html<String>
+where
+    S: Serialize,
+{
+    let template = match htmx {
+        true => ENV.get_template(&format!("partials/{}.html", template)),
+        false => ENV.get_template(&format!("pages/{}.html", template_degraded)),
+    };
+
+    // todo: or 500 (switch to status result<html, status code>)
+    let template = template.unwrap();
+    Html(template.render(ctx).unwrap())
+}
+
+fn run_game(game: GameIDS, bots: &[&str]) -> Result<u64, anyhow::Error> {
     match game {
         GameIDS::Gravitrips => {
             gravitrips::main(&format!("bots/{}.wasm", bots[0]), &format!("bots/{}.wasm", bots[1]))
         },
-        GameIDS::Chess => Err(anyhow::Error::msg("chess not implementted")),
+        GameIDS::Chess => Err(anyhow::Error::msg("chess not implemented")),
     }
 }

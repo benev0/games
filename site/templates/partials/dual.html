@@ -1,6 +1,9 @@
 <form
+  hx-boost="true"
   action="/dual"
   method="post"
+  hx-target="this"
+  hx-swap="outerHTML"
 >
   <label for="game">select the game</label>
   <select name="game" id="game">

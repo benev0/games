@@ -1,7 +1,7 @@
 
 <h1>Events</h1>
 
-<ul>
+<ul hx-boost:inherited="true" hx-target:inherited="#page-content" hx-push-url:inherited="true">
 {% for event in events %}
   <li><a href="/event/{{ event }}">{{ event }}</a></li>
 {% endfor %}

@@ -182,7 +182,7 @@ impl Board {
     }
 }
 
-pub fn main(player1: &str, player2: &str) -> wasmtime::Result<()> {
+pub fn main(player1: &str, player2: &str) -> wasmtime::Result<u64> {
     let engine = Engine::default();
     let p1_component = Component::from_file(&engine, player1)?;
     let p2_component = Component::from_file(&engine, player2)?;
@@ -232,5 +232,9 @@ pub fn main(player1: &str, player2: &str) -> wasmtime::Result<()> {
     dbg!(&board);
     dbg!(&win);
     dbg!(move_count + 1);
-    Ok(())
+    Ok(match win {
+        GameEnd::Win(p) => (!p) as u64 + 1,
+        GameEnd::Loss(p, _) => (!p) as u64 + 1,
+        GameEnd::Draw => 0,
+    })
 }
