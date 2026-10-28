@@ -314,6 +314,26 @@ pub(crate) async fn create_user_submitted_bot_for_event(pool: &SqlitePool, hash:
     Ok(bot_id)
 }
 
+pub(crate) async fn create_user_submitted_bot(pool: &SqlitePool, hash: &[u8], created: i64, user_id: i64, game_id: i64) -> anyhow::Result<i64> {
+    let mut conn = pool.acquire().await?;
+    let bot_id: i64 = query!(
+        "insert into user_submitted_bot ( bot_hash, created, user_id, game_id )
+        values ( ?1, ?2, ?3, ?4 )
+        on conflict(user_id, bot_hash) do update set user_id = excluded.user_id
+        returning id
+        ",
+        hash,
+        created,
+        user_id,
+        game_id,
+    ).fetch_one(&mut *conn)
+    .await?
+    .id
+    .ok_or(anyhow::Error::msg("missing return id (user_submitted_bot)"))?;
+
+    Ok(bot_id)
+}
+
 pub(crate) async fn get_bots_from_user(pool: &SqlitePool, id: i64) -> anyhow::Result<Vec<Bot>> {
     let mut conn = pool.acquire().await?;
 

@@ -12,14 +12,17 @@
   {% endfor %}
   </select>
   <label for="bot1">select bot to enter as player 1</label>
-  {% for bot in bot_submissions %}
+
   <select name="bot1" id="bot1">
+    {% for bot in bot_submissions %}
     <option value="{{ bot }}">{{ bot }}</option>
+    {% endfor %}
   </select>
   <label for="bot2">select bot to enter as player 2</label>
   <select name="bot2" id="bot2">
+    {% for bot in bot_submissions %}
     <option value="{{ bot }}">{{ bot }}</option>
+    {% endfor %}
   </select>
-  {% endfor %}
   <input type="submit" value="Submit">
 </form>

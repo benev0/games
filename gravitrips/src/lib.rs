@@ -1,4 +1,4 @@
-use wasmtime::{component::*};
+use wasmtime::{Config, component::*};
 use wasmtime::{Engine, Store};
 
 use crate::exports::games::gravitrips::next_move::{Board,};
@@ -182,16 +182,23 @@ impl Board {
     }
 }
 
-pub fn main(player1: &str, player2: &str) -> wasmtime::Result<u64> {
-    let engine = Engine::default();
+pub fn main(player1: &str, player2: &str, fuel: Option<u64>) -> wasmtime::Result<u64> {
+    let mut config = Config::new();
+    config.consume_fuel(fuel.is_some());
+    let engine = Engine::new(&config)?;
     let p1_component = Component::from_file(&engine, player1)?;
     let p2_component = Component::from_file(&engine, player2)?;
 
     let linker = Linker::new(&engine);
-    let mut store = Store::new(&engine, ());
 
-    let p1_bindings = Gravitrips::instantiate(&mut store, &p1_component, &linker)?;
-    let p2_bindings = Gravitrips::instantiate(&mut store, &p2_component, &linker)?;
+    let mut store1 = Store::new(&engine, ());
+    fuel.and_then(|f| store1.set_fuel(f).ok());
+    // store1.set_fuel(10_000)?;
+    let p1_bindings = Gravitrips::instantiate(&mut store1, &p1_component, &linker)?;
+
+    let mut store2 = Store::new(&engine, ());
+    fuel.and_then(|f| store2.set_fuel(f).ok());
+    let p2_bindings = Gravitrips::instantiate(&mut store2, &p2_component, &linker)?;
 
     let mut board = Board {
         heights: vec![ 0, 0, 0, 0, 0, 0, 0 ],
@@ -207,8 +214,8 @@ pub fn main(player1: &str, player2: &str) -> wasmtime::Result<u64> {
         }
 
         let move_result = match to_play {
-            true => p1_bindings.games_gravitrips_next_move().call_make_move(&mut store, &board),
-            false => p2_bindings.games_gravitrips_next_move().call_make_move(&mut store, &board),
+            true => p1_bindings.games_gravitrips_next_move().call_make_move(&mut store1, &board),
+            false => p2_bindings.games_gravitrips_next_move().call_make_move(&mut store2, &board),
         };
 
         let result = if let Ok(result) = move_result {
@@ -233,8 +240,8 @@ pub fn main(player1: &str, player2: &str) -> wasmtime::Result<u64> {
     dbg!(&win);
     dbg!(move_count + 1);
     Ok(match win {
-        GameEnd::Win(p) => (!p) as u64 + 1,
-        GameEnd::Loss(p, _) => (!p) as u64 + 1,
+        GameEnd::Win(p) => !p as u64 + 1,
+        GameEnd::Loss(p, _) => p as u64 + 1,
         GameEnd::Draw => 0,
     })
 }

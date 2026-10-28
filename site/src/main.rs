@@ -1,12 +1,7 @@
 mod database;
 
 use axum::{
-    Router,
-    extract::{FromRef, Path, Request, State, Multipart},
-    http::StatusCode,
-    middleware::{self, Next},
-    response::{Html, IntoResponse, Redirect, Response},
-    routing::{get, post},
+    Router, body::Bytes, extract::{FromRef, Multipart, Path, Request, State}, http::StatusCode, middleware::{self, Next}, response::{Html, IntoResponse, Redirect, Response}, routing::{get, post},
 };
 use axum_extra::extract::{
     CookieJar, Form, PrivateCookieJar, cookie::{Cookie, Key}
@@ -25,7 +20,7 @@ use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::database::{
-    create_end_code, create_event, create_game, create_user, create_user_submitted_bot_for_event, get_all_event_names, get_bots_from_event_and_user, get_bots_from_user, get_event_with_name, get_game_event_names, get_game_with_name, get_games, get_username, login_user, make_user_admin, user_exists, user_is_admin
+    create_end_code, create_event, create_game, create_user, create_user_submitted_bot, create_user_submitted_bot_for_event, get_all_event_names, get_bots_from_event_and_user, get_bots_from_user, get_event_with_name, get_game_event_names, get_game_with_name, get_games, get_username, login_user, make_user_admin, user_exists, user_is_admin
 };
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
@@ -131,6 +126,7 @@ async fn main() {
     let protected_routes = Router::new()
         .route("/", get(games))
         .route("/profile", get(profile))
+        .route("/submit-bot", post(submit_bot))
         .route("/settings", get(settings))
         .route("/games/{game}", get(specific_game))
         .route("/dual", post(dual))
@@ -329,6 +325,62 @@ async fn profile(
     decide_htmx(hx_boosted, "profile", context! { username => username, bot_submissions => bot_hashes, games => games })
 }
 
+async fn submit_bot(
+    State(state): State<SiteState>,
+    HxBoosted(_hx_boosted): HxBoosted,
+    jar: PrivateCookieJar,
+    mut multipart: Multipart,
+) -> Html<String> {
+    let user_id = get_user_id(jar).unwrap();
+
+    let mut data: Option<Bytes> = None;
+    let mut game_id: Option<i64> = None;
+
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        match field.name() {
+            Some("bot") => {
+                data = field.bytes().await.ok();
+            },
+            Some("game-selector") => {
+                let v = field.text().await.ok();
+                game_id = v.and_then(|s| s.parse().ok());
+            },
+            Some(_) => {},
+            None => {},
+        };
+    }
+
+    let data = match data {
+        Some(data) => data,
+        None => return Html("failure".to_string()),
+    };
+
+    let game_id = match game_id {
+        Some(game_id) => game_id,
+        None => return Html("failure".to_string()),
+    };
+
+    let mut hasher = Sha3_512::new();
+    hasher.update(&data);
+    let hash = hasher.finalize();
+    let filename = URL_SAFE.encode(hash);
+
+    match tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(format!("./bots/{}.wasm", filename))
+        .await
+    {
+        Ok(mut file) => {
+            let _ = file.write(&data).await;
+        },
+        Err(_) => {},
+    }
+
+    let _ = create_user_submitted_bot(&state.database, &hash, 0, user_id, game_id).await.unwrap();
+    return Html("success".to_string());
+}
+
 async fn settings(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
     decide_htmx(hx_boosted, "settings", context! {})
 }
@@ -382,33 +434,42 @@ async fn submit_new_bot_for_event(
 ) -> Html<String> {
     let user_id = get_user_id(jar).unwrap();
 
+    let mut data: Option<Bytes> = None;
+
     while let Some(field) = multipart.next_field().await.unwrap() {
-        if let Some("bot") = field.name() {
-            let data = field.bytes().await.unwrap();
-            let mut hasher = Sha3_512::new();
-            hasher.update(&data);
-            let hash = hasher.finalize();
-            let filename = URL_SAFE.encode(hash);
-
-            match tokio::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(format!("./bots/{}.wasm", filename))
-                .await
-            {
-                Ok(mut file) => {
-                    let _ = file.write(&data).await;
-                },
-                Err(_) => {},
-            }
-
-            let _ = tokio::fs::write(format!("./bots/{}.wasm", filename), &data).await.unwrap();
-
-            let _ = create_user_submitted_bot_for_event(&state.database, &hash, 0, user_id, &event_name).await.unwrap();
-            return Html("success".to_string());
-        }
+        match field.name() {
+            Some("bot") => {
+                data = field.bytes().await.ok();
+            },
+            Some(_) => {},
+            None => {},
+        };
     }
-    Html("failure".to_string())
+
+    let data = match data {
+        Some(data) => data,
+        None => return Html("failure".to_string()),
+    };
+
+    let mut hasher = Sha3_512::new();
+    hasher.update(&data);
+    let hash = hasher.finalize();
+    let filename = URL_SAFE.encode(hash);
+
+    match tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(format!("./bots/{}.wasm", filename))
+        .await
+    {
+        Ok(mut file) => {
+            let _ = file.write(&data).await;
+        },
+        Err(_) => {},
+    }
+
+    let _ = create_user_submitted_bot_for_event(&state.database, &hash, 0, user_id, &event_name).await.unwrap();
+    Html("success".to_string())
 }
 
 async fn admin_game(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
@@ -517,7 +578,7 @@ where
 fn run_game(game: GameIDS, bots: &[&str]) -> Result<u64, anyhow::Error> {
     match game {
         GameIDS::Gravitrips => {
-            gravitrips::main(&format!("bots/{}.wasm", bots[0]), &format!("bots/{}.wasm", bots[1]))
+            gravitrips::main(&format!("bots/{}.wasm", bots[0]), &format!("bots/{}.wasm", bots[1]), Some(100_000))
         },
         GameIDS::Chess => Err(anyhow::Error::msg("chess not implemented")),
     }
