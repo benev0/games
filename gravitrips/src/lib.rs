@@ -1,8 +1,7 @@
 use wasmtime::{Config, component::*};
 use wasmtime::{Engine, Store};
 
-use crate::exports::games::gravitrips::next_move::{Board,};
-
+use crate::exports::games::gravitrips::next_move::Board;
 
 bindgen!({
     path: "../wit/gravitrips.wit",
@@ -17,11 +16,11 @@ const VERTICAL_WIN: u8 = 15;
 enum BadMove {
     ColumnInvalid,
     ColumnFull,
-    WasmError
+    WasmError,
 }
 
 #[derive(Debug)]
-enum GameEnd{
+enum GameEnd {
     Win(bool),
     Loss(bool, BadMove),
     Draw,
@@ -34,7 +33,8 @@ impl Board {
         if let Some(&column_data) = self.columns.get::<usize>(column.into())
             && let Some(&height_data) = self.heights.get::<usize>(column.into())
             && height_data >= WIN_CONNECT
-            && !(column_data >> (height_data - WIN_CONNECT)) & VERTICAL_WIN == VERTICAL_WIN {
+            && !(column_data >> (height_data - WIN_CONNECT)) & VERTICAL_WIN == VERTICAL_WIN
+        {
             return true;
         }
 
@@ -43,27 +43,33 @@ impl Board {
             && let Some(&height_level) = self.heights.get::<usize>(column.into())
             && (column_data >> (height_level - 1)) & 1 == 0
         {
-
             let mut seq_count = 1;
 
             let mut offset = 1;
             // right side
-            while let Some(&height_adjacent) = self.heights.get::<usize>(<u8 as Into<usize>>::into(column) + offset)
+            while let Some(&height_adjacent) = self
+                .heights
+                .get::<usize>(<u8 as Into<usize>>::into(column) + offset)
                 && height_adjacent >= height_level
-                && let Some(&col_adjacent) = self.columns.get::<usize>(<u8 as Into<usize>>::into(column) + offset)
-                && (col_adjacent >> (height_level - 1)) & 1 == 0 {
+                && let Some(&col_adjacent) = self
+                    .columns
+                    .get::<usize>(<u8 as Into<usize>>::into(column) + offset)
+                && (col_adjacent >> (height_level - 1)) & 1 == 0
+            {
                 seq_count += 1;
                 offset += 1
             }
 
             offset = 1;
             // left side
-            while let Some(&height_adjacent) = self.heights.get::<usize>(<u8 as Into<usize>>::into(column) - offset)
-                && height_adjacent >= height_level {
+            while let Some(&height_adjacent) = self
+                .heights
+                .get::<usize>(<u8 as Into<usize>>::into(column) - offset)
+                && height_adjacent >= height_level
+            {
                 seq_count += 1;
                 offset += 1
             }
-
 
             if seq_count >= WIN_CONNECT {
                 return true;
@@ -75,15 +81,19 @@ impl Board {
             && let Some(&height_level) = self.heights.get::<usize>(column.into())
             && (column_data >> (height_level - 1)) & 1 == 0
         {
-
             let mut seq_count = 1;
 
             let mut offset = 1;
             // right side
-            while let Some(&height_adjacent) = self.heights.get::<usize>(<u8 as Into<usize>>::into(column) + offset) {
+            while let Some(&height_adjacent) = self
+                .heights
+                .get::<usize>(<u8 as Into<usize>>::into(column) + offset)
+            {
                 if let Ok(offset_u8) = <usize as TryInto<u8>>::try_into(offset)
                     && height_adjacent >= height_level + offset_u8
-                    && let Some(&col_adjacent) = self.columns.get::<usize>(<u8 as Into<usize>>::into(column) + offset)
+                    && let Some(&col_adjacent) = self
+                        .columns
+                        .get::<usize>(<u8 as Into<usize>>::into(column) + offset)
                     && (col_adjacent >> (height_level - 1 - offset_u8)) & 1 == 0
                 {
                     seq_count += 1;
@@ -95,10 +105,15 @@ impl Board {
 
             offset = 1;
             // left side
-            while let Some(&height_adjacent) = self.heights.get::<usize>(<u8 as Into<usize>>::into(column) - offset) {
+            while let Some(&height_adjacent) = self
+                .heights
+                .get::<usize>(<u8 as Into<usize>>::into(column) - offset)
+            {
                 if let Ok(offset_u8) = <usize as TryInto<u8>>::try_into(offset)
                     && height_adjacent >= height_level - offset_u8
-                    && let Some(&col_adjacent) = self.columns.get::<usize>(<u8 as Into<usize>>::into(column) - offset)
+                    && let Some(&col_adjacent) = self
+                        .columns
+                        .get::<usize>(<u8 as Into<usize>>::into(column) - offset)
                     && (col_adjacent >> (height_level - 1 + offset_u8)) & 1 == 0
                 {
                     seq_count += 1;
@@ -107,7 +122,6 @@ impl Board {
                     break;
                 }
             }
-
 
             if seq_count >= WIN_CONNECT {
                 return true;
@@ -119,15 +133,19 @@ impl Board {
             && let Some(&height_level) = self.heights.get::<usize>(column.into())
             && (column_data >> (height_level - 1)) & 1 == 0
         {
-
             let mut seq_count = 1;
 
             let mut offset = 1;
             // right side
-            while let Some(&height_adjacent) = self.heights.get::<usize>(<u8 as Into<usize>>::into(column) + offset) {
+            while let Some(&height_adjacent) = self
+                .heights
+                .get::<usize>(<u8 as Into<usize>>::into(column) + offset)
+            {
                 if let Ok(offset_u8) = <usize as TryInto<u8>>::try_into(offset)
                     && height_adjacent >= height_level - offset_u8
-                    && let Some(&col_adjacent) = self.columns.get::<usize>(<u8 as Into<usize>>::into(column) + offset)
+                    && let Some(&col_adjacent) = self
+                        .columns
+                        .get::<usize>(<u8 as Into<usize>>::into(column) + offset)
                     && (col_adjacent >> (height_level - 1 + offset_u8)) & 1 == 0
                 {
                     seq_count += 1;
@@ -139,10 +157,15 @@ impl Board {
 
             offset = 1;
             // left side
-            while let Some(&height_adjacent) = self.heights.get::<usize>(<u8 as Into<usize>>::into(column) - offset) {
+            while let Some(&height_adjacent) = self
+                .heights
+                .get::<usize>(<u8 as Into<usize>>::into(column) - offset)
+            {
                 if let Ok(offset_u8) = <usize as TryInto<u8>>::try_into(offset)
                     && height_adjacent >= height_level + offset_u8
-                    && let Some(&col_adjacent) = self.columns.get::<usize>(<u8 as Into<usize>>::into(column) - offset)
+                    && let Some(&col_adjacent) = self
+                        .columns
+                        .get::<usize>(<u8 as Into<usize>>::into(column) - offset)
                     && (col_adjacent >> (height_level - 1 - offset_u8)) & 1 == 0
                 {
                     seq_count += 1;
@@ -151,7 +174,6 @@ impl Board {
                     break;
                 }
             }
-
 
             if seq_count >= WIN_CONNECT {
                 return true;
@@ -162,9 +184,14 @@ impl Board {
     }
 
     fn confirm_move(&mut self, column: u8) -> Result<(), BadMove> {
-
-        let height: &mut u8 = self.heights.get_mut::<usize>(column.into()).ok_or(BadMove::ColumnInvalid)?;
-        let column: &mut u8 = self.columns.get_mut::<usize>(column.into()).ok_or(BadMove::ColumnInvalid)?;
+        let height: &mut u8 = self
+            .heights
+            .get_mut::<usize>(column.into())
+            .ok_or(BadMove::ColumnInvalid)?;
+        let column: &mut u8 = self
+            .columns
+            .get_mut::<usize>(column.into())
+            .ok_or(BadMove::ColumnInvalid)?;
 
         if *height >= BOARD_ROWS {
             return Err(BadMove::ColumnFull);
@@ -201,8 +228,8 @@ pub fn main(player1: &str, player2: &str, fuel: Option<u64>) -> wasmtime::Result
     let p2_bindings = Gravitrips::instantiate(&mut store2, &p2_component, &linker)?;
 
     let mut board = Board {
-        heights: vec![ 0, 0, 0, 0, 0, 0, 0 ],
-        columns: vec![ 0, 0, 0, 0, 0, 0, 0 ],
+        heights: vec![0, 0, 0, 0, 0, 0, 0],
+        columns: vec![0, 0, 0, 0, 0, 0, 0],
     };
 
     // p1: true, p2 false
@@ -214,14 +241,18 @@ pub fn main(player1: &str, player2: &str, fuel: Option<u64>) -> wasmtime::Result
         }
 
         let move_result = match to_play {
-            true => p1_bindings.games_gravitrips_next_move().call_make_move(&mut store1, &board),
-            false => p2_bindings.games_gravitrips_next_move().call_make_move(&mut store2, &board),
+            true => p1_bindings
+                .games_gravitrips_next_move()
+                .call_make_move(&mut store1, &board),
+            false => p2_bindings
+                .games_gravitrips_next_move()
+                .call_make_move(&mut store2, &board),
         };
 
         let result = if let Ok(result) = move_result {
             result
         } else {
-            break GameEnd::Loss(to_play, BadMove::WasmError)
+            break GameEnd::Loss(to_play, BadMove::WasmError);
         };
 
         if let Err(status) = board.confirm_move(result) {
@@ -233,7 +264,6 @@ pub fn main(player1: &str, player2: &str, fuel: Option<u64>) -> wasmtime::Result
         move_count += 1;
         to_play = !to_play;
     };
-
 
     println!("game_over");
     dbg!(&board);

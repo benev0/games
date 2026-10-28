@@ -1,13 +1,20 @@
 mod database;
 
 use axum::{
-    Router, body::Bytes, extract::{FromRef, Multipart, Path, Request, State}, http::StatusCode, middleware::{self, Next}, response::{Html, IntoResponse, Redirect, Response}, routing::{get, post},
+    Router,
+    body::Bytes,
+    extract::{FromRef, Multipart, Path, Request, State},
+    http::StatusCode,
+    middleware::{self, Next},
+    response::{Html, IntoResponse, Redirect, Response},
+    routing::{get, post},
 };
 use axum_extra::extract::{
-    CookieJar, Form, PrivateCookieJar, cookie::{Cookie, Key}
+    CookieJar, Form, PrivateCookieJar,
+    cookie::{Cookie, Key},
 };
 use axum_htmx::HxBoosted;
-use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use minijinja::{Environment, path_loader};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -20,7 +27,10 @@ use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::database::{
-    create_end_code, create_event, create_game, create_user, create_user_submitted_bot, create_user_submitted_bot_for_event, get_all_event_names, get_bots_from_event_and_user, get_bots_from_user, get_event_with_name, get_game_event_names, get_game_with_name, get_games, get_username, login_user, make_user_admin, user_exists, user_is_admin
+    create_end_code, create_event, create_game, create_user, create_user_submitted_bot,
+    create_user_submitted_bot_for_event, get_all_event_names, get_bots_from_event_and_user,
+    get_bots_from_user, get_event_with_name, get_game_event_names, get_game_with_name, get_games,
+    get_username, login_user, make_user_admin, user_exists, user_is_admin,
 };
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
@@ -307,7 +317,9 @@ async fn profile(
     jar: PrivateCookieJar,
 ) -> Html<String> {
     let id = get_user_id(jar).unwrap();
-    let username = get_username(&state.database, id).await.unwrap_or("Unknown Username".to_owned());
+    let username = get_username(&state.database, id)
+        .await
+        .unwrap_or("Unknown Username".to_owned());
     let bot_hashes: Vec<String> = get_bots_from_user(&state.database, id)
         .await
         .unwrap_or(Vec::new())
@@ -320,9 +332,16 @@ async fn profile(
         name: &'a str,
         id: u64,
     }
-    let games = vec![Game { name: "gravitrips", id: 1 }];
+    let games = vec![Game {
+        name: "gravitrips",
+        id: 1,
+    }];
 
-    decide_htmx(hx_boosted, "profile", context! { username => username, bot_submissions => bot_hashes, games => games })
+    decide_htmx(
+        hx_boosted,
+        "profile",
+        context! { username => username, bot_submissions => bot_hashes, games => games },
+    )
 }
 
 async fn submit_bot(
@@ -340,13 +359,13 @@ async fn submit_bot(
         match field.name() {
             Some("bot") => {
                 data = field.bytes().await.ok();
-            },
+            }
             Some("game-selector") => {
                 let v = field.text().await.ok();
                 game_id = v.and_then(|s| s.parse().ok());
-            },
-            Some(_) => {},
-            None => {},
+            }
+            Some(_) => {}
+            None => {}
         };
     }
 
@@ -373,11 +392,13 @@ async fn submit_bot(
     {
         Ok(mut file) => {
             let _ = file.write(&data).await;
-        },
-        Err(_) => {},
+        }
+        Err(_) => {}
     }
 
-    let _ = create_user_submitted_bot(&state.database, &hash, 0, user_id, game_id).await.unwrap();
+    let _ = create_user_submitted_bot(&state.database, &hash, 0, user_id, game_id)
+        .await
+        .unwrap();
     return Html("success".to_string());
 }
 
@@ -390,9 +411,17 @@ async fn specific_game(
     Path(game_name): Path<String>,
     HxBoosted(hx_boosted): HxBoosted,
 ) -> Html<String> {
-    let (_id, description) = get_game_with_name(&state.database, &game_name).await.unwrap_or((0, "game not found".to_string()));
-    let event_names = get_game_event_names(&state.database, &game_name).await.unwrap();
-    decide_htmx(hx_boosted, "games_", context! { game => game_name, description => description, events => event_names})
+    let (_id, description) = get_game_with_name(&state.database, &game_name)
+        .await
+        .unwrap_or((0, "game not found".to_string()));
+    let event_names = get_game_event_names(&state.database, &game_name)
+        .await
+        .unwrap();
+    decide_htmx(
+        hx_boosted,
+        "games_",
+        context! { game => game_name, description => description, events => event_names},
+    )
 }
 
 async fn dual(
@@ -401,13 +430,15 @@ async fn dual(
     Form(dual): Form<DualData>,
 ) -> Html<String> {
     let winner = run_game(dual.game.try_into().unwrap(), &[&dual.bot1, &dual.bot2]).unwrap_or(0);
-    decide_htmx_multi(hx_boosted, "dual_result", "profile", context! { winner => winner })
+    decide_htmx_multi(
+        hx_boosted,
+        "dual_result",
+        "profile",
+        context! { winner => winner },
+    )
 }
 
-async fn events(
-    State(state): State<SiteState>,
-    HxBoosted(hx_boosted): HxBoosted,
-) -> Html<String> {
+async fn events(State(state): State<SiteState>, HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
     let event_names = get_all_event_names(&state.database).await.unwrap();
     decide_htmx(hx_boosted, "events", context! { events => event_names })
 }
@@ -419,10 +450,18 @@ async fn event(
     jar: PrivateCookieJar,
 ) -> Html<String> {
     let user_id = get_user_id(jar).unwrap(); // should be a 400 range error on fail
-    let event_data = get_event_with_name(&state.database, &event_name).await.unwrap();
-    let submissions = get_bots_from_event_and_user(&state.database, event_data.id, user_id).await.unwrap();
+    let event_data = get_event_with_name(&state.database, &event_name)
+        .await
+        .unwrap();
+    let submissions = get_bots_from_event_and_user(&state.database, event_data.id, user_id)
+        .await
+        .unwrap();
     let available_bots = get_bots_from_user(&state.database, user_id).await.unwrap();
-    decide_htmx(hx_boosted, "event_", context! { event => event_data, submissions => submissions, available_bots => available_bots })
+    decide_htmx(
+        hx_boosted,
+        "event_",
+        context! { event => event_data, submissions => submissions, available_bots => available_bots },
+    )
 }
 
 async fn submit_new_bot_for_event(
@@ -430,7 +469,7 @@ async fn submit_new_bot_for_event(
     Path(event_name): Path<String>,
     HxBoosted(_hx_boosted): HxBoosted,
     jar: PrivateCookieJar,
-    mut multipart: Multipart
+    mut multipart: Multipart,
 ) -> Html<String> {
     let user_id = get_user_id(jar).unwrap();
 
@@ -440,9 +479,9 @@ async fn submit_new_bot_for_event(
         match field.name() {
             Some("bot") => {
                 data = field.bytes().await.ok();
-            },
-            Some(_) => {},
-            None => {},
+            }
+            Some(_) => {}
+            None => {}
         };
     }
 
@@ -464,11 +503,13 @@ async fn submit_new_bot_for_event(
     {
         Ok(mut file) => {
             let _ = file.write(&data).await;
-        },
-        Err(_) => {},
+        }
+        Err(_) => {}
     }
 
-    let _ = create_user_submitted_bot_for_event(&state.database, &hash, 0, user_id, &event_name).await.unwrap();
+    let _ = create_user_submitted_bot_for_event(&state.database, &hash, 0, user_id, &event_name)
+        .await
+        .unwrap();
     Html("success".to_string())
 }
 
@@ -476,10 +517,7 @@ async fn admin_game(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
     decide_htmx(hx_boosted, "admin/game", context! {})
 }
 
-async fn admin_make_game(
-    State(state): State<SiteState>,
-    Form(game): Form<GameInfo>,
-) -> StatusCode {
+async fn admin_make_game(State(state): State<SiteState>, Form(game): Form<GameInfo>) -> StatusCode {
     match create_game(&state.database, &game.name, &game.description).await {
         Ok(_) => StatusCode::CREATED,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -488,7 +526,7 @@ async fn admin_make_game(
 
 async fn admin_event(
     State(state): State<SiteState>,
-    HxBoosted(hx_boosted): HxBoosted
+    HxBoosted(hx_boosted): HxBoosted,
 ) -> Html<String> {
     let games = get_games(&state.database).await.unwrap();
     decide_htmx(hx_boosted, "admin/event", context! { games => games })
@@ -504,9 +542,7 @@ async fn admin_make_event(
     }
 }
 
-async fn admin_end_code(
-    HxBoosted(hx_boosted): HxBoosted
-) -> Html<String> {
+async fn admin_end_code(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
     decide_htmx(hx_boosted, "admin/end_code", context! {})
 }
 
@@ -577,9 +613,11 @@ where
 
 fn run_game(game: GameIDS, bots: &[&str]) -> Result<u64, anyhow::Error> {
     match game {
-        GameIDS::Gravitrips => {
-            gravitrips::main(&format!("bots/{}.wasm", bots[0]), &format!("bots/{}.wasm", bots[1]), Some(100_000))
-        },
+        GameIDS::Gravitrips => gravitrips::main(
+            &format!("bots/{}.wasm", bots[0]),
+            &format!("bots/{}.wasm", bots[1]),
+            Some(100_000),
+        ),
         GameIDS::Chess => Err(anyhow::Error::msg("chess not implemented")),
     }
 }
