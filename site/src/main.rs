@@ -136,9 +136,11 @@ async fn main() {
     let protected_routes = Router::new()
         .route("/", get(games))
         .route("/profile", get(profile))
+        .route("/submit-bot", get(Redirect::to("/profile")))
         .route("/submit-bot", post(submit_bot))
         .route("/settings", get(settings))
         .route("/games/{game}", get(specific_game))
+        .route("/dual", get(Redirect::to("/profile")))
         .route("/dual", post(dual))
         .route("/events", get(events))
         .route("/event/{event_name}", get(event))
@@ -379,6 +381,15 @@ async fn submit_bot(
         None => return Html("failure".to_string()),
     };
 
+    let hash = save_file(&data).await.unwrap();
+
+    let _ = create_user_submitted_bot(&state.database, &hash, 0, user_id, game_id)
+        .await
+        .unwrap();
+    return Html("success".to_string());
+}
+
+async fn save_file(data: &Bytes) -> Result<[u8; 8], anyhow::Error> {
     let mut hasher = Sha3_512::new();
     hasher.update(&data);
     let hash = hasher.finalize();
@@ -394,12 +405,9 @@ async fn submit_bot(
             let _ = file.write(&data).await;
         }
         Err(_) => {}
-    }
-
-    let _ = create_user_submitted_bot(&state.database, &hash, 0, user_id, game_id)
-        .await
-        .unwrap();
-    return Html("success".to_string());
+    };
+    let hash = core::array::from_fn(|i| hash[i]);
+    Ok(hash)
 }
 
 async fn settings(HxBoosted(hx_boosted): HxBoosted) -> Html<String> {
@@ -429,7 +437,7 @@ async fn dual(
     HxBoosted(hx_boosted): HxBoosted,
     Form(dual): Form<DualData>,
 ) -> Html<String> {
-    let winner = run_game(dual.game.try_into().unwrap(), &[&dual.bot1, &dual.bot2]).unwrap_or(0);
+    let winner = run_game(dual.game.try_into().unwrap(), &[&dual.bot1, &dual.bot2]).await.unwrap_or(0);
     decide_htmx_multi(
         hx_boosted,
         "dual_result",
@@ -490,22 +498,7 @@ async fn submit_new_bot_for_event(
         None => return Html("failure".to_string()),
     };
 
-    let mut hasher = Sha3_512::new();
-    hasher.update(&data);
-    let hash = hasher.finalize();
-    let filename = URL_SAFE.encode(hash);
-
-    match tokio::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(format!("./bots/{}.wasm", filename))
-        .await
-    {
-        Ok(mut file) => {
-            let _ = file.write(&data).await;
-        }
-        Err(_) => {}
-    }
+    let hash = save_file(&data).await.unwrap();
 
     let _ = create_user_submitted_bot_for_event(&state.database, &hash, 0, user_id, &event_name)
         .await
@@ -611,7 +604,7 @@ where
     Html(template.render(ctx).unwrap())
 }
 
-fn run_game(game: GameIDS, bots: &[&str]) -> Result<u64, anyhow::Error> {
+async fn run_game(game: GameIDS, bots: &[&str]) -> Result<u64, anyhow::Error> {
     match game {
         GameIDS::Gravitrips => gravitrips::main(
             &format!("bots/{}.wasm", bots[0]),
